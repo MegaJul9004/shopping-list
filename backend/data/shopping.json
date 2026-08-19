@@ -1,7 +1,9 @@
 ﻿{
     "families":  null,
     "users":  null,
-    "shoppingItems":  null,
+    "shoppingItems":  [
+
+                      ],
     "recurringItems":  [
 
                        ],
@@ -9,10 +11,7 @@
 
                         ],
     "familySettings":  [
-                           {
-                               "familyId":  "8W6NRE",
-                               "duplicateBehavior":  "merge"
-                           }
+
                        ],
     "miniLists":  [
 

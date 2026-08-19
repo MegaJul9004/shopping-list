@@ -13,9 +13,11 @@ import {
   addToOfferWatchlist,
   createFamily,
   createUser,
+  deleteFamilyBranchLocation,
   deleteItem,
   deleteMiniList,
   deleteRecurringItem,
+  getFamilyBranchLocations,
   getFamilyById,
   getFamilyLocations,
   getFamilySettings,
@@ -26,6 +28,7 @@ import {
   getItemsByFamily,
   getRecurringItemsByFamily,
   removeFromOfferWatchlist,
+  saveFamilyBranchLocation,
   setFamilyLocation,
   setFamilySettings,
   smartAddItem,
@@ -378,7 +381,7 @@ app.delete(
   }
 );
 
-// ── Markt-Standorte ─────────────────────────────────────────────────
+// ── Markt-Standorte / Filialen ──────────────────────────────────────
 app.get("/api/families/:familyId/locations", authMiddleware, (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
 
@@ -389,6 +392,45 @@ app.get("/api/families/:familyId/locations", authMiddleware, (req, res) => {
   return res.json({ locations: getFamilyLocations(familyId) });
 });
 
+app.get("/api/families/:familyId/branches", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed" });
+  }
+  return res.json({ branches: getFamilyBranchLocations(familyId) });
+});
+
+app.post("/api/families/:familyId/branches/:market", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  const market = String(req.params.market || "").trim().toUpperCase();
+
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed" });
+  }
+
+  const saved = saveFamilyBranchLocation({
+    familyId,
+    market,
+    branchName: req.body?.branchName,
+    branchCity: req.body?.branchCity,
+    branchZip: req.body?.branchZip,
+    branchId: req.body?.branchId,
+    locationUrl: req.body?.locationUrl
+  });
+  return res.json({ branch: saved });
+});
+
+app.delete("/api/families/:familyId/branches/:market", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  const market = String(req.params.market || "").trim().toUpperCase();
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed" });
+  }
+  deleteFamilyBranchLocation({ familyId, market });
+  return res.json({ ok: true });
+});
+
+// ── Legacy: einfache Standorte (Weiterleitung an Branches) ─────────
 app.post("/api/families/:familyId/locations", authMiddleware, (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
   const market = String(req.body?.market || "").trim().toUpperCase();
@@ -396,14 +438,10 @@ app.post("/api/families/:familyId/locations", authMiddleware, (req, res) => {
   const locationUrl = String(req.body?.locationUrl || "").trim();
 
   if (req.auth.familyId !== familyId) {
-    return res.status(403).json({ error: "Not allowed for this family" });
+    return res.status(403).json({ error: "Not allowed" });
   }
 
-  if (!market || !locationName) {
-    return res.status(400).json({ error: "market and locationName are required" });
-  }
-
-  const saved = setFamilyLocation({ familyId, market, locationName, locationUrl });
+  const saved = saveFamilyBranchLocation({ familyId, market, branchName: locationName, locationUrl });
   return res.status(201).json({ location: saved });
 });
 

@@ -29,7 +29,7 @@ export default function OffersPage({ session, theme }) {
     try {
       const offset = refresh ? 0 : liveOffersOffset;
       const refreshParam = refresh ? "&refresh=1" : "";
-      const data = await api(/offers/live?market=&offset=&limit=20);
+      const data = await api(\/offers/live?market=\&offset=\&limit=20\\);
       if (refresh) setLiveOffers(data.offers);
       else setLiveOffers((prev) => [...prev, ...data.offers]);
       setLiveOffersHasMore(data.hasMore);
@@ -48,7 +48,7 @@ export default function OffersPage({ session, theme }) {
     if (!session) return;
     setLoadingOffers(true);
     try {
-      const data = await api(/offers/compare?markets=, {}, session.token);
+      const data = await api(\/offers/compare?markets=\\, {}, session.token);
       setOffersResult(data);
     } catch (e) { console.error(e); }
     setLoadingOffers(false);
@@ -58,39 +58,47 @@ export default function OffersPage({ session, theme }) {
     setSelectedMarkets((prev) => prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]);
   };
 
+  // Load branches
   useEffect(() => {
     if (!session) return;
-    api(/families//locations, {}, session.token)
+    api(\/families/\/branches\, {}, session.token)
       .then((data) => {
         const locs = {};
-        for (const loc of data.locations || []) locs[loc.market] = loc;
+        for (const [market, branch] of Object.entries(data.branches || {})) {
+          locs[market] = branch;
+        }
         setLocations(locs);
       }).catch(() => {});
   }, [session]);
 
   const saveLocation = async (market) => {
     const form = locationForms[market] || {};
-    if (!form.locationName) return;
+    if (!form.branchName && !form.locationName) return;
     try {
-      const data = await api(/families//locations,
-        { method: "POST", body: JSON.stringify({ market, ...form }) }, session.token);
-      if (data.location) setLocations((prev) => ({ ...prev, [market]: data.location }));
+      const data = await api(\/families/\/branches/\\,
+        { method: "POST", body: JSON.stringify({
+          branchName: form.branchName || form.locationName,
+          branchCity: form.branchCity || "",
+          branchZip: form.branchZip || "",
+          branchId: form.branchId || "",
+          locationUrl: form.locationUrl || ""
+        }) }, session.token);
+      if (data.branch) setLocations((prev) => ({ ...prev, [market]: data.branch }));
     } catch (e) { console.error(e); }
   };
-
   useEffect(() => {
     if (!session) return;
-    api(/families//offer-watchlist, {}, session.token)
+    api(\/families/\/offer-watchlist\, {}, session.token)
       .then((data) => setWatchlist(data.watchlist || [])).catch(() => {});
   }, [session]);
 
   const addWatchItem = async () => {
     if (!watchSearch.trim() || !session) return;
     try {
-      await api(/families//offer-watchlist,
+      await api(\/families/\/offer-watchlist\,
         { method: "POST", body: JSON.stringify({ searchTerm: watchSearch.trim() }) }, session.token);
       setWatchSearch("");
-      const data = await api(/families//offer-watchlist, {}, session.token);
+      const data = await api(\/families/\/offer-watchlist\, {}, session.token);
       setWatchlist(data.watchlist || []);
     } catch (e) { console.error(e); }
   };
@@ -98,7 +106,7 @@ export default function OffersPage({ session, theme }) {
   const removeWatchItem = async (watchId) => {
     if (!session) return;
     try {
-      await api(/families//offer-watchlist/, { method: "DELETE" }, session.token);
+      await api(\/families/\/offer-watchlist/\\, { method: "DELETE" }, session.token);
       setWatchlist((prev) => prev.filter((w) => w.id !== watchId));
     } catch (e) { console.error(e); }
   };
@@ -140,7 +148,7 @@ export default function OffersPage({ session, theme }) {
   const exportCsv = async () => {
     if (!session) return;
     try {
-      const data = await api(/offers/export?markets=&format=csv, {}, session.token);
+      const data = await api(\/offers/export?markets=\&format=csv\, {}, session.token);
       const blob = new Blob([data.csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -161,24 +169,21 @@ export default function OffersPage({ session, theme }) {
         <section className="card">
           <h2>📰 Live-Angebote</h2>
           <div className="live-controls">
-            <label>
-              Ansicht
-              <select value={liveMarketView} onChange={(e) => { setLiveMarketView(e.target.value); setLiveOffersOffset(0); }}>
-                <option value="ALL">Alle M\u00e4rkte</option>
-                {MARKETS.map((m) => <option value={m} key={iew-\}>{m}</option>)}
-              </select>
-            </label>
+            <label>Ansicht<select value={liveMarketView} onChange={(e) => { setLiveMarketView(e.target.value); setLiveOffersOffset(0); }}>
+              <option value="ALL">Alle M\u00e4rkte</option>
+              {MARKETS.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select></label>
             <button type="button" className="ghost" onClick={() => loadLiveOffers(true)}>Neu laden</button>
           </div>
           <ul className="live-offers-list">
             {liveOffers.map((offer, i) => (
-              <li key={\-\}>
+              <li key={i}>
                 <div>
                   <strong>{offer.market}</strong>
                   <p>{offer.title}</p>
                 </div>
                 <div className="offer-meta">
-                  <span>{Number.isFinite(offer.price) ? \ EUR : "Preis n/a"}</span>
+                  <span>{Number.isFinite(offer.price) ? (\\ EUR\) : "Preis n/a"}</span>
                   <a href={offer.url} target="_blank" rel="noreferrer">\u00d6ffnen</a>
                 </div>
               </li>
@@ -195,8 +200,7 @@ export default function OffersPage({ session, theme }) {
           <h2>🔍 Angebotssuche</h2>
           <p className="muted">Durchsuche alle aktuellen Angebote nach Stichwort</p>
           <div className="add-form" style={{gridTemplateColumns:"1fr auto"}}>
-            <input type="text" placeholder="z. B. H\u00e4hnchen, Milch..."
-              value={offerSearch}
+            <input type="text" placeholder="z. B. H\u00e4hnchen, Milch..." value={offerSearch}
               onChange={(e) => setOfferSearch(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && searchOffers()}
             />
@@ -205,18 +209,13 @@ export default function OffersPage({ session, theme }) {
             </button>
           </div>
           {offerSearchMeta && (
-            <p className="muted" style={{margin:"0.5rem 0"}}>
-              {offerSearchMeta.matches} Treffer in {offerSearchMeta.total} Angeboten
-            </p>
+            <p className="muted" style={{margin:"0.5rem 0"}}>{offerSearchMeta.matches} Treffer in {offerSearchMeta.total} Angeboten</p>
           )}
           <ul className="live-offers-list">
             {offerSearchResults.map((offer, i) => (
-              <li key={sr-\-\}>
+              <li key={sr-\}>
                 <div><strong>{offer.market}</strong><p>{offer.title}</p></div>
-                <div className="offer-meta">
-                  <span>{Number.isFinite(offer.price) ? \ EUR : "Preis n/a"}</span>
-                  <a href={offer.url} target="_blank" rel="noreferrer">\u00d6ffnen</a>
-                </div>
+                <div className="offer-meta"><span>{Number.isFinite(offer.price) ? (\\ EUR\) : "n/a"}</span><a href={offer.url} target="_blank" rel="noreferrer">\u00d6ffnen</a></div>
               </li>
             ))}
           </ul>
@@ -224,14 +223,13 @@ export default function OffersPage({ session, theme }) {
 
         <section className="card">
           <h2>👀 Angebots-Watchlist</h2>
-          <p className="muted">Lege Suchbegriffe fest, auf die du lauschen m\u00f6chtest</p>
+          <p className="muted">Suchbegriffe festlegen und auf Angebote lauschen</p>
           <div className="add-form" style={{gridTemplateColumns:"1fr auto"}}>
-            <input type="text" placeholder="z. B. H\u00e4hnchenbrust"
-              value={watchSearch}
+            <input type="text" placeholder="z. B. H\u00e4hnchen" value={watchSearch}
               onChange={(e) => setWatchSearch(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addWatchItem()}
             />
-            <button type="button" onClick={addWatchItem}>Hinzuf\u00fcgen</button>
+            <button type="button" onClick={addWatchItem}>+ Hinzuf\u00fcgen</button>
           </div>
           {watchlist.length > 0 && (
             <>
@@ -239,28 +237,21 @@ export default function OffersPage({ session, theme }) {
                 {watchlist.map((w) => (
                   <li key={w.id}>
                     <span>🔔 {w.searchTerm}</span>
-                    <button type="button" className="danger" onClick={() => removeWatchItem(w.id)}>✕</button>
+                    <button className="danger" onClick={() => removeWatchItem(w.id)}>✕</button>
                   </li>
                 ))}
               </ul>
-              <button type="button" onClick={searchWatchlist} disabled={watchLoading} style={{marginTop:"0.5rem"}}>
-                {watchLoading ? "Suche..." : "Jetzt nach Angeboten suchen"}
+              <button type="button" onClick={searchWatchlist} disabled={watchLoading}>
+                {watchLoading ? "Suche..." : "Jetzt pr\u00fcfen"}
               </button>
             </>
           )}
           {watchResults.length > 0 && (
             <ul className="live-offers-list" style={{marginTop:"0.5rem"}}>
               {watchResults.map((offer, i) => (
-                <li key={wr-\-\}>
-                  <div>
-                    <strong>{offer.market}</strong>
-                    <p>{offer.title}</p>
-                    <span className="muted">🔍 {offer.watchTerm}</span>
-                  </div>
-                  <div className="offer-meta">
-                    <span>{Number.isFinite(offer.price) ? \ EUR : "Preis n/a"}</span>
-                    <a href={offer.url} target="_blank" rel="noreferrer">\u00d6ffnen</a>
-                  </div>
+                <li key={wr-\}>
+                  <div><strong>{offer.market}</strong><p>{offer.title}</p><span className="muted">🔍 {offer.watchTerm}</span></div>
+                  <div className="offer-meta"><span>{Number.isFinite(offer.price) ? (\\ EUR\) : "n/a"}</span><a href={offer.url} target="_blank" rel="noreferrer">\u00d6ffnen</a></div>
                 </li>
               ))}
             </ul>
@@ -270,8 +261,8 @@ export default function OffersPage({ session, theme }) {
 
       <div className="dashboard-grid" style={{marginTop:"1rem"}}>
         <section className="card">
-          <h2>🏪 Filialen ausw\u00e4hlen</h2>
-          <p className="muted">W\u00e4hle deine Stamm-Filialen f\u00fcr genauere Angebote</p>
+          <h2>🏪 Meine Filialen</h2>
+          <p className="muted">Gespeicherte Filial-Standorte (bearbeiten in den Einstellungen)</p>
           <div className="locations-grid">
             {MARKETS.map((market) => {
               const loc = locations[market];
@@ -280,15 +271,24 @@ export default function OffersPage({ session, theme }) {
                 <div className="location-entry" key={market}>
                   <strong>{market}</strong>
                   <div style={{display:"grid", gap:"0.3rem"}}>
-                    <input type="text" placeholder="Filialname"
-                      value={form.locationName ?? loc?.locationName ?? ""}
-                      onChange={(e) => setLocationForms((prev) => ({...prev, [market]: {...prev[market], locationName: e.target.value}}))}
+                    {loc ? (
+                      <>
+                        <p style={{margin:0}}><strong>{loc.branchName}</strong></p>
+                        {loc.branchZip && <span className="muted">PLZ {loc.branchZip}, {loc.branchCity || ""}</span>}
+                        {loc.locationUrl && <a href={loc.locationUrl} target="_blank" rel="noreferrer">Angebote \u00f6ffnen</a>}
+                      </>
+                    ) : (
+                      <p className="muted" style={{margin:0}}>Keine Filiale gespeichert</p>
+                    )}
+                    <input type="text" placeholder="Filialname (f\u00fcr Schnellsuche)" style={{fontSize:"0.85rem"}}
+                      value={form.branchName ?? loc?.branchName ?? ""}
+                      onChange={(e) => setLocationForms((prev) => ({...prev, [market]: {...prev[market], branchName: e.target.value}}))}
                     />
-                    <input type="text" placeholder="URL (optional)"
+                    <input type="text" placeholder="URL (optional)" style={{fontSize:"0.85rem"}}
                       value={form.locationUrl ?? loc?.locationUrl ?? ""}
                       onChange={(e) => setLocationForms((prev) => ({...prev, [market]: {...prev[market], locationUrl: e.target.value}}))}
                     />
-                    <button type="button" className="ghost" onClick={() => saveLocation(market)}>
+                    <button type="button" className="ghost" onClick={() => saveLocation(market)} style={{fontSize:"0.85rem"}}>
                       {loc ? "Aktualisieren" : "Speichern"}
                     </button>
                   </div>
@@ -302,18 +302,13 @@ export default function OffersPage({ session, theme }) {
           <h2>💰 Preisvergleich</h2>
           <div className="switch-row">
             {MARKETS.map((m) => (
-              <button key={m} type="button"
-                className={	ab \}
-                onClick={() => toggleMarket(m)}
-              >{m}</button>
+              <button key={m} type="button" className={\	ab \\} onClick={() => toggleMarket(m)}>{m}</button>
             ))}
           </div>
           <button type="button" onClick={loadComparison} disabled={loadingOffers}>
             {loadingOffers ? "Vergleiche..." : "Vergleichen"}
           </button>
-          <button type="button" className="ghost" onClick={exportCsv} style={{marginLeft:"0.5rem"}}>
-            Export CSV
-          </button>
+          <button type="button" className="ghost" onClick={exportCsv} style={{marginLeft:"0.5rem"}}>Export CSV</button>
           {offersResult?.recommendation && (
             <div className="recommendation" style={{marginTop:"0.8rem"}}>
               <strong>Empfehlung: {offersResult.recommendation.market}</strong>
@@ -324,13 +319,6 @@ export default function OffersPage({ session, theme }) {
             <ul className="offer-summary">
               {offersResult.marketTotals.map((entry) => (
                 <li key={entry.market}><strong>{entry.market}</strong>: {entry.coveredItems}/{entry.totalItems} | {entry.totalPrice.toFixed(2)} EUR</li>
-              ))}
-            </ul>
-          )}
-          {offersResult?.bestPerItem?.length > 0 && (
-            <ul className="offer-summary">
-              {offersResult.bestPerItem.map((entry) => (
-                <li key={entry.itemName}>{entry.itemName}: {entry.best ? ${entry.best.market} ( EUR) : "nicht gefunden"}</li>
               ))}
             </ul>
           )}

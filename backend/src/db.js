@@ -228,6 +228,55 @@ export function setFamilyLocation({ familyId, market, locationName, locationUrl 
   );
 }
 // ── Family Settings ─────────────────────────────────────────────────
+// ── Extended Branch Locations (PLZ, Ort, Filial-ID) ────────────────
+export function getFamilyBranchLocations(familyId) {
+  const entries = store.familyLocations.filter((entry) => entry.familyId === familyId);
+  const result = {};
+  for (const e of entries) {
+    result[e.market] = {
+      market: e.market,
+      branchName: e.branchName || e.locationName || "",
+      branchCity: e.branchCity || "",
+      branchZip: e.branchZip || "",
+      branchId: e.branchId || "",
+      locationUrl: e.locationUrl || ""
+    };
+  }
+  return result;
+}
+
+export function saveFamilyBranchLocation({ familyId, market, branchName, branchCity, branchZip, branchId, locationUrl }) {
+  const index = store.familyLocations.findIndex(
+    (entry) => entry.familyId === familyId && entry.market === market
+  );
+  const payload = {
+    familyId,
+    market,
+    branchName: String(branchName || "").trim(),
+    branchCity: String(branchCity || "").trim(),
+    branchZip: String(branchZip || "").trim(),
+    branchId: String(branchId || "").trim(),
+    locationUrl: String(locationUrl || "").trim()
+  };
+
+  if (index >= 0) {
+    store.familyLocations[index] = payload;
+  } else {
+    store.familyLocations.push(payload);
+  }
+  persist();
+  return payload;
+}
+
+export function deleteFamilyBranchLocation({ familyId, market }) {
+  const before = store.familyLocations.length;
+  store.familyLocations = store.familyLocations.filter(
+    (e) => !(e.familyId === familyId && e.market === market)
+  );
+  const changed = store.familyLocations.length < before;
+  if (changed) persist();
+  return changed;
+}
 export function getFamilySettings(familyId) {
   const entry = store.familySettings.find((s) => s.familyId === familyId);
   return entry || { familyId, duplicateBehavior: "merge" };
