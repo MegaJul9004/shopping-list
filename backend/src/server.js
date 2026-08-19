@@ -8,18 +8,27 @@ import { customAlphabet, nanoid } from "nanoid";
 import { Server } from "socket.io";
 import {
   addItem,
+  addMiniList,
   addRecurringItem,
+  addToOfferWatchlist,
   createFamily,
   createUser,
   deleteItem,
+  deleteMiniList,
   deleteRecurringItem,
   getFamilyById,
   getFamilyLocations,
+  getFamilySettings,
+  getMiniLists,
+  getOfferWatchlist,
   getUserByFamilyAndUsername,
   getUserById,
   getItemsByFamily,
   getRecurringItemsByFamily,
+  removeFromOfferWatchlist,
   setFamilyLocation,
+  setFamilySettings,
+  smartAddItem,
   updateItem
 } from "./db.js";
 import { buildExportByMarket, compareMarkets } from "./offers.js";
@@ -241,10 +250,18 @@ app.post("/api/families/:familyId/items", authMiddleware, (req, res) => {
     return res.status(400).json({ error: "Item name is required" });
   }
 
-  addItem({ id: nanoid(10), familyId, name, quantity });
+  const settings = getFamilySettings(familyId);
+  const result = smartAddItem({
+    id: nanoid(10),
+    familyId,
+    name,
+    quantity,
+    duplicateBehavior: settings.duplicateBehavior
+  });
+
   emitItems(familyId);
 
-  return res.status(201).json({ ok: true });
+  return res.status(result.merged ? 200 : 201).json({ ok: true, item: result.item, merged: result.merged });
 });
 
 app.patch("/api/families/:familyId/items/:itemId", authMiddleware, (req, res) => {
@@ -401,6 +418,99 @@ app.get("/api/offers/locations", (_req, res) => {
   return res.json({ locations });
 });
 
+// ── Family Settings ─────────────────────────────────────────────────
+app.get("/api/families/:familyId/settings", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed" });
+  }
+  return res.json({ settings: getFamilySettings(familyId) });
+});
+
+app.post("/api/families/:familyId/settings", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed" });
+  }
+  const updated = setFamilySettings({
+    familyId,
+    duplicateBehavior: req.body?.duplicateBehavior
+  });
+  return res.json({ settings: updated });
+});
+
+// ── Mini-Lists / Recipes ───────────────────────────────────────────
+app.get("/api/families/:familyId/mini-lists", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed" });
+  }
+  return res.json({ miniLists: getMiniLists(familyId) });
+});
+
+app.post("/api/families/:familyId/mini-lists", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed" });
+  }
+  const name = String(req.body?.name || "").trim();
+  const items = Array.isArray(req.body?.items) ? req.body.items : [];
+  if (!name || items.length === 0) {
+    return res.status(400).json({ error: "name and items are required" });
+  }
+  addMiniList({ id: nanoid(10), familyId, name, items });
+  return res.status(201).json({ ok: true });
+});
+
+app.delete("/api/families/:familyId/mini-lists/:listId", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  const listId = String(req.params.listId || "");
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed" });
+  }
+  const deleted = deleteMiniList({ listId, familyId });
+  if (!deleted) {
+    return res.status(404).json({ error: "List not found" });
+  }
+  return res.json({ ok: true });
+});
+
+// ── Offer Watchlist ─────────────────────────────────────────────────
+app.get("/api/families/:familyId/offer-watchlist", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed" });
+  }
+  return res.json({ watchlist: getOfferWatchlist(familyId) });
+});
+
+app.post("/api/families/:familyId/offer-watchlist", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed" });
+  }
+  const searchTerm = String(req.body?.searchTerm || "").trim();
+  if (!searchTerm) {
+    return res.status(400).json({ error: "searchTerm is required" });
+  }
+  addToOfferWatchlist({ id: nanoid(10), familyId, searchTerm });
+  return res.status(201).json({ ok: true });
+});
+
+app.delete("/api/families/:familyId/offer-watchlist/:watchId", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  const watchId = String(req.params.watchId || "");
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed" });
+  }
+  const deleted = removeFromOfferWatchlist({ watchId, familyId });
+  if (!deleted) {
+    return res.status(404).json({ error: "Watchlist entry not found" });
+  }
+  return res.json({ ok: true });
+});
+
+// ── Recipe Search ──────────────────────────────────────────────────
 app.get("/api/recipes/search", async (req, res) => {
   const query = String(req.query.q || "").trim();
   if (!query) {

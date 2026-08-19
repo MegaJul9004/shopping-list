@@ -373,6 +373,72 @@ h3 {
   }
 }
 
+/* ── Navbar ─────────────────────────────────────────────────────────── */
+
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 1.2rem;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid #ffffffcc;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.navbar-brand a {
+  font-family: "Sora", sans-serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--brand);
+  text-decoration: none;
+}
+
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-link {
+  color: #1f2a37;
+  text-decoration: none;
+  padding: 0.35rem 0.6rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  transition: background 160ms;
+}
+
+.nav-link:hover {
+  background: #e0edf5;
+}
+
+.nav-link.active {
+  background: var(--brand);
+  color: #fff;
+}
+
+.nav-btn {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.6rem;
+}
+
+@media (max-width: 600px) {
+  .navbar-links .nav-link span,
+  .navbar-links .nav-link:not(.active) {
+    display: none;
+  }
+}
+
+/* ── Theme Presets ── */  
+
+.theme-presets {
+  display: grid;
+  grid-template-colums: repeat(aoto-fill, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
 /* ── Theme Picker ──────────────────────────────────────────────────── */
 
 .theme-picker {

@@ -14,7 +14,10 @@ function defaultStore() {
     users: [],
     shoppingItems: [],
     recurringItems: [],
-    familyLocations: []
+    familyLocations: [],
+    familySettings: [],
+    miniLists: [],
+    offerWatchlist: []
   };
 }
 
@@ -37,7 +40,10 @@ function loadStore() {
       users: Array.isArray(parsed.users) ? parsed.users : [],
       shoppingItems: Array.isArray(parsed.shoppingItems) ? parsed.shoppingItems : [],
       recurringItems: Array.isArray(parsed.recurringItems) ? parsed.recurringItems : [],
-      familyLocations: Array.isArray(parsed.familyLocations) ? parsed.familyLocations : []
+      familyLocations: Array.isArray(parsed.familyLocations) ? parsed.familyLocations : [],
+      familySettings: Array.isArray(parsed.familySettings) ? parsed.familySettings : [],
+      miniLists: Array.isArray(parsed.miniLists) ? parsed.miniLists : [],
+      offerWatchlist: Array.isArray(parsed.offerWatchlist) ? parsed.offerWatchlist : []
     };
   } catch {
     return defaultStore();
@@ -220,4 +226,108 @@ export function setFamilyLocation({ familyId, market, locationName, locationUrl 
   return store.familyLocations.find(
     (entry) => entry.familyId === familyId && entry.market === market
   );
+}
+// ── Family Settings ─────────────────────────────────────────────────
+export function getFamilySettings(familyId) {
+  const entry = store.familySettings.find((s) => s.familyId === familyId);
+  return entry || { familyId, duplicateBehavior: "merge" };
+}
+
+export function setFamilySettings({ familyId, duplicateBehavior }) {
+  const index = store.familySettings.findIndex((s) => s.familyId === familyId);
+  const payload = {
+    familyId,
+    duplicateBehavior: duplicateBehavior === "separate" ? "separate" : "merge"
+  };
+
+  if (index >= 0) {
+    store.familySettings[index] = payload;
+  } else {
+    store.familySettings.push(payload);
+  }
+
+  persist();
+  return payload;
+}
+
+// ── Smart Add Item (mit Duplikat-Erkennung) ─────────────────────────
+export function smartAddItem({ id, familyId, name, quantity, duplicateBehavior }) {
+  const normalized = name.toLowerCase().replace(/ß/g, "ss").trim();
+
+  const existing = store.shoppingItems.find(
+    (item) =>
+      item.familyId === familyId &&
+      !item.checked &&
+      item.name.toLowerCase().replace(/ß/g, "ss").trim() === normalized
+  );
+
+  if (existing && duplicateBehavior === "merge") {
+    existing.quantity += quantity;
+    persist();
+    return { merged: true, item: existing };
+  }
+
+  store.shoppingItems.push({
+    id,
+    familyId,
+    name,
+    quantity,
+    checked: false,
+    createdAt: new Date().toISOString()
+  });
+  persist();
+  return { merged: false, item: store.shoppingItems[store.shoppingItems.length - 1] };
+}
+
+// ── Mini-Lists / Recipes ────────────────────────────────────────────
+export function getMiniLists(familyId) {
+  return store.miniLists
+    .filter((ml) => ml.familyId === familyId)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export function addMiniList({ id, familyId, name, items }) {
+  store.miniLists.push({
+    id,
+    familyId,
+    name,
+    items: Array.isArray(items) ? items : [],
+    createdAt: new Date().toISOString()
+  });
+  persist();
+}
+
+export function deleteMiniList({ listId, familyId }) {
+  const before = store.miniLists.length;
+  store.miniLists = store.miniLists.filter(
+    (ml) => !(ml.id === listId && ml.familyId === familyId)
+  );
+  const changed = store.miniLists.length < before;
+  if (changed) persist();
+  return changed;
+}
+
+// ── Offer Watchlist ─────────────────────────────────────────────────
+export function getOfferWatchlist(familyId) {
+  return store.offerWatchlist.filter((e) => e.familyId === familyId);
+}
+
+export function addToOfferWatchlist({ id, familyId, searchTerm }) {
+  store.offerWatchlist.push({
+    id,
+    familyId,
+    searchTerm: String(searchTerm || "").trim(),
+    createdAt: new Date().toISOString()
+  });
+  persist();
+}
+
+export function removeFromOfferWatchlist({ watchId, familyId }) {
+  const before = store.offerWatchlist.length;
+  store.offerWatchlist = store.offerWatchlist.filter(
+    (e) => !(e.id === watchId && e.familyId === familyId)
+  );
+  const changed = store.offerWatchlist.length < before;
+  if (changed) persist();
+  return changed;
 }
