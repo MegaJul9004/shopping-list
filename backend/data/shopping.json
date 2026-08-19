@@ -1,22 +1,70 @@
-﻿{
-    "families":  null,
-    "users":  null,
-    "shoppingItems":  [
-
-                      ],
-    "recurringItems":  [
-
-                       ],
-    "familyLocations":  [
-
-                        ],
-    "familySettings":  [
-
-                       ],
-    "miniLists":  [
-
-                  ],
-    "offerWatchlist":  [
-
-                       ]
+{
+  "families": [
+    {
+      "id": "G44WPS",
+      "name": "2",
+      "createdAt": "2026-08-19T16:24:44.617Z"
+    },
+    {
+      "id": "UKTX4Y",
+      "name": "3",
+      "createdAt": "2026-08-19T16:35:05.470Z"
+    }
+  ],
+  "users": [
+    {
+      "id": "D7R6leRQ6hJJ",
+      "familyId": "G44WPS",
+      "username": "2",
+      "passwordHash": "$2a$10$U/5RwPEeT2qL5jxcEZPwx.g5sqRaHIFExf8/L90k0vTs2hKnfSqeS",
+      "createdAt": "2026-08-19T16:24:44.691Z"
+    },
+    {
+      "id": "BsAkMatqX1B0",
+      "familyId": "UKTX4Y",
+      "username": "3",
+      "passwordHash": "$2a$10$Wbpin381yL5k7WKcYCfdKOcOrmBAHUZhiTgPfzyI92k3ul5OjTl4W",
+      "createdAt": "2026-08-19T16:35:05.539Z"
+    },
+    {
+      "id": "NodLnlb0UFo0",
+      "familyId": "UKTX4Y",
+      "username": "te",
+      "passwordHash": "$2a$10$4gisBGtz71V.8eWhTy6Haej8H/JOajul6GSP/vyrKP7A1YD6nAfOu",
+      "createdAt": "2026-08-19T16:35:47.849Z"
+    }
+  ],
+  "shoppingItems": [],
+  "recurringItems": [],
+  "familyLocations": [
+    {
+      "familyId": "UKTX4Y",
+      "market": "LIDL",
+      "branchName": "EDEKA Center Cramer",
+      "branchCity": "Burgdorf",
+      "branchZip": "31303",
+      "branchId": "801341",
+      "locationUrl": "https://www.edeka.de/maerkte/801341/"
+    }
+  ],
+  "familySettings": [],
+  "miniLists": [
+    {
+      "id": "6v3M5j9qs5",
+      "familyId": "UKTX4Y",
+      "name": "Wrap Pizza",
+      "items": [
+        {
+          "name": "Tomaten",
+          "quantity": 1
+        },
+        {
+          "name": "Wraps",
+          "quantity": 1
+        }
+      ],
+      "createdAt": "2026-08-19T16:38:00.623Z"
+    }
+  ],
+  "offerWatchlist": []
 }

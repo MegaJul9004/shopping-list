@@ -209,13 +209,13 @@ export default function App() {
     <div>
       <nav className="navbar">
         <div className="navbar-brand">
-          <Link to="/">\ud83d\uded2 Einkaufsliste</Link>
+          <Link to="/">🛒 Einkaufsliste</Link>
         </div>
         <div className="navbar-links">
           {session && (
             <>
-              <Link to="/settings" className="nav-link">\u2699\ufe0f Einstellungen</Link>
-              <Link to="/offers" className="nav-link">\ud83c\udfea Angebote</Link>
+              <Link to="/settings" className="nav-link">⚙️ Einstellungen</Link>
+              <Link to="/offers" className="nav-link">🏷️ Angebote</Link>
               <button type="button" className="danger nav-btn" onClick={handleLogout}>Abmelden</button>
             </>
           )}
@@ -237,10 +237,10 @@ export default function App() {
             <header className="hero">
               <p className="eyebrow">Family Sync</p>
               <h1>Gemeinsame Einkaufsliste</h1>
-              <p className="muted" style={{color:"#cde3e3",marginTop:"0.4rem"}}>Familie: {session.familyName} \u00b7 Code: {session.familyId}</p>
+              <p className="muted" style={{color:"#cde3e3",marginTop:"0.4rem"}}>Familie: {session.familyName} · Code: {session.familyId}</p>
               <div style={{display:"flex",gap:"0.5rem",marginTop:"0.6rem"}}>
-                <Link to="/settings" className="btn-inline">\u2699\ufe0f Einstellungen</Link>
-                <Link to="/offers" className="btn-inline">\ud83c\udfea Angebote</Link>
+                <Link to="/settings" className="btn-inline">⚙️ Einstellungen</Link>
+                <Link to="/offers" className="btn-inline">🏷️ Angebote</Link>
               </div>
             </header>
             {error && <div className="error-banner">{error}</div>}
@@ -249,13 +249,13 @@ export default function App() {
               <section className="card">
                 <h2>Einkaufsliste</h2>
                 <div className="family-chip">
-                  <span className="muted">Menge erh\u00f6hen: {settings.duplicateBehavior === "merge" ? "\u2705 An" : "\u274c Aus"}</span>
+                  <span className="muted">Menge erhöhen: {settings.duplicateBehavior === "merge" ? "\u2705 An" : "\u274c Aus"}</span>
                   <Link to="/settings">Einstellungen</Link>
                 </div>
                 <div className="add-form">
                   <input type="text" placeholder="Artikel eingeben" value={itemName} onChange={(e) => setItemName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addItem()} />
                   <input type="number" min={1} value={itemQty} onChange={(e) => setItemQty(Math.max(1, Number(e.target.value)))} />
-                  <button type="button" onClick={addItem}>Hinzuf\u00fcgen</button>
+                  <button type="button" onClick={addItem}>Hinzufügen</button>
                 </div>
                 <ul className="list">
                   {items.map((item) => (
@@ -267,7 +267,7 @@ export default function App() {
                       </label>
                       <div className="item-actions">
                         <button className="ghost" onClick={() => { setItemName(item.name); setItemQty(item.quantity); deleteItem(item.id); }}>Bearbeiten</button>
-                        <button className="danger" onClick={() => deleteItem(item.id)}>L\u00f6schen</button>
+                        <button className="danger" onClick={() => deleteItem(item.id)}>Löschen</button>
                       </div>
                     </li>
                   ))}
@@ -275,7 +275,7 @@ export default function App() {
               </section>
 
               <section className="card">
-                <h2>\ud83d\udccb Mini-Listen</h2>
+                <h2>📋 Mini-Listen</h2>
                 <div className="add-form" style={{gridTemplateColumns:"1fr auto"}}>
                   <input type="text" placeholder="Listenname" value={miniListName} onChange={(e) => setMiniListName(e.target.value)} />
                   <button type="button" onClick={() => setShowMiniListEditor(true)}>+ Neu</button>
@@ -285,7 +285,7 @@ export default function App() {
                     <input type="text" placeholder="Zutat (Enter)" value={miniListItemInput} onChange={(e) => setMiniListItemInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && miniListItemInput.trim()) { setMiniListItems([...miniListItems, {name: miniListItemInput.trim(), quantity: 1}]); setMiniListItemInput(""); }}} />
                     <ul className="recurring-list" style={{margin:"0.4rem 0"}}>
                       {miniListItems.map((mi, idx) => (
-                        <li key={idx}><span>{mi.name} ({mi.quantity}x)</span><button className="danger" onClick={() => setMiniListItems(miniListItems.filter((_, i) => i !== idx))}>\u2715</button></li>
+                        <li key={idx}><span>{mi.name} ({mi.quantity}x)</span><button className="danger" onClick={() => setMiniListItems(miniListItems.filter((_, i) => i !== idx))}>✕</button></li>
                       ))}
                     </ul>
                     <div className="switch-row">
@@ -301,7 +301,7 @@ export default function App() {
                         <div><strong>{ml.name}</strong><p className="muted">{ml.items.length} Zutaten</p></div>
                         <div className="item-actions">
                           <button onClick={() => addMiniListToShopping(ml)}>+ Zur Liste</button>
-                          <button className="danger" onClick={() => deleteMiniList(ml.id)}>\u2715</button>
+                          <button className="danger" onClick={() => deleteMiniList(ml.id)}>✕</button>
                         </div>
                       </li>
                     ))}
@@ -312,26 +312,26 @@ export default function App() {
 
             <div className="dashboard-grid wide" style={{marginTop:"1rem"}}>
               <section className="card">
-                <h2>\ud83d\udd04 Wiederkehrende Artikel</h2>
+                <h2>🔄 Wiederkehrende Artikel</h2>
                 <div className="recurring-form">
                   <input type="text" placeholder="Artikel" value={recurName} onChange={(e) => setRecurName(e.target.value)} />
                   <input type="number" min={1} value={recurQty} onChange={(e) => setRecurQty(Math.max(1, Number(e.target.value)))} />
                   <select value={recurDay} onChange={(e) => setRecurDay(Number(e.target.value))}>
                     {DAY_NAMES.map((name, idx) => <option key={idx} value={idx}>{name}</option>)}
                   </select>
-                  <button type="button" onClick={addRecurring}>+ Hinzuf\u00fcgen</button>
+                  <button type="button" onClick={addRecurring}>+ Hinzufügen</button>
                 </div>
                 {recurringItems.length > 0 && (
                   <ul className="recurring-list">
                     {recurringItems.map((ritem) => (
-                      <li key={ritem.id}><span>{ritem.name} ({ritem.quantity}x) - <span className="muted">{DAY_NAMES[ritem.dayOfWeek]}</span></span><button className="danger" onClick={() => deleteRecurring(ritem.id)}>\u2715</button></li>
+                      <li key={ritem.id}><span>{ritem.name} ({ritem.quantity}x) - <span className="muted">{DAY_NAMES[ritem.dayOfWeek]}</span></span><button className="danger" onClick={() => deleteRecurring(ritem.id)}>✕</button></li>
                     ))}
                   </ul>
                 )}
               </section>
 
               <section className="card">
-                <h2>\ud83c\udf73 Rezepte finden</h2>
+                <h2>🍳 Rezepte finden</h2>
                 <div className="recipe-form">
                   <input type="text" placeholder="Suchbegriff" value={recipeQuery} onChange={(e) => setRecipeQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && searchRecipes()} />
                   <button type="button" onClick={searchRecipes} disabled={loadingRecipes}>{loadingRecipes ? "Suche..." : "Suchen"}</button>
@@ -346,7 +346,7 @@ export default function App() {
                 </div>
                 <div className="family-chip">
                   {selectedIngredients.map((ing, idx) => (
-                    <span key={idx} className="tag">{ing}<button className="danger" onClick={() => setSelectedIngredients(selectedIngredients.filter((_, i) => i !== idx))}>\u2715</button></span>
+                    <span key={idx} className="tag">{ing}<button className="danger" onClick={() => setSelectedIngredients(selectedIngredients.filter((_, i) => i !== idx))}>✕</button></span>
                   ))}
                 </div>
               </section>

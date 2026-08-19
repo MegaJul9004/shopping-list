@@ -162,17 +162,17 @@ export default function OffersPage() {
         <p className="eyebrow">Angebote</p>
         <h1>Markt-Angebote durchsuchen & vergleichen</h1>
         <div style={{display:"flex",gap:"0.5rem",marginTop:"0.6rem"}}>
-          <Link to="/" className="btn-inline">\u2190 Zur\u00fcck</Link>
-          <Link to="/settings" className="btn-inline">\u2699\ufe0f Einstellungen</Link>
+          <Link to="/" className="btn-inline">u2190 Zuru00fcck</Link>
+          <Link to="/settings" className="btn-inline">u2699ufe0f Einstellungen</Link>
         </div>
       </div>
 
       <div className="dashboard-grid wide" style={{marginTop:"1.4rem"}}>
         <section className="card">
-          <h2>\ud83d\udcf0 Live-Angebote</h2>
+          <h2>ud83dudcf0 Live-Angebote</h2>
           <div className="live-controls">
             <label>Ansicht<select value={liveMarketView} onChange={(e) => { setLiveMarketView(e.target.value); setLiveOffersOffset(0); }}>
-              <option value="ALL">Alle M\u00e4rkte</option>
+              <option value="ALL">Alle Mu00e4rkte</option>
               {MARKETS.map((m) => <option key={m} value={m}>{m}</option>)}
             </select></label>
             <button type="button" className="ghost" onClick={() => loadLiveOffers(true)}>Neu laden</button>
@@ -182,24 +182,24 @@ export default function OffersPage() {
               <li key={i}>
                 <div><strong>{offer.market}</strong><p>{offer.title}</p></div>
                 <div className="offer-meta">
-                  <span>{Number.isFinite(offer.price) ? (\\ EUR`) : "Preis n/a"}</span>
-                  <a href={offer.url} target="_blank" rel="noreferrer">\u00d6ffnen</a>
+                  <span>{Number.isFinite(offer.price) ? `${offer.price.toFixed(2)} €` : "Preis n/a"}</span>
+                  <a href={offer.url} target="_blank" rel="noreferrer">u00d6ffnen</a>
                 </div>
               </li>
             ))}
           </ul>
           {liveOffersHasMore && (
             <button type="button" onClick={() => loadLiveOffers(false)} disabled={loadingLiveOffers}>
-              {loadingLiveOffers ? "L\u00e4dt..." : "Mehr Angebote laden"}
+              {loadingLiveOffers ? "Lu00e4dt..." : "Mehr Angebote laden"}
             </button>
           )}
         </section>
 
         <section className="card">
-          <h2>\ud83d\udd0d Angebotssuche</h2>
+          <h2>ud83dudd0d Angebotssuche</h2>
           <p className="muted">Durchsuche alle aktuellen Angebote nach Stichwort</p>
           <div className="add-form" style={{gridTemplateColumns:"1fr auto"}}>
-            <input type="text" placeholder="z. B. H\u00e4hnchen, Milch..." value={offerSearch}
+            <input type="text" placeholder="z. B. Hu00e4hnchen, Milch..." value={offerSearch}
               onChange={(e) => setOfferSearch(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && searchOffers()}
             />
@@ -214,31 +214,31 @@ export default function OffersPage() {
             {offerSearchResults.map((offer, i) => (
               <li key={i}>
                 <div><strong>{offer.market}</strong><p>{offer.title}</p></div>
-                <div className="offer-meta"><span>{Number.isFinite(offer.price) ? (\\ EUR`) : "n/a"}</span><a href={offer.url} target="_blank" rel="noreferrer">\u00d6ffnen</a></div>
+                <div className="offer-meta"><span>{Number.isFinite(offer.price) ? `${offer.price.toFixed(2)} €` : "n/a"}</span><a href={offer.url} target="_blank" rel="noreferrer">u00d6ffnen</a></div>
               </li>
             ))}
           </ul>
         </section>
 
         <section className="card">
-          <h2>\ud83d\udc40 Angebots-Watchlist</h2>
+          <h2>ud83dudc40 Angebots-Watchlist</h2>
           <p className="muted">Suchbegriffe festlegen und auf Angebote lauschen</p>
           <div className="add-form" style={{gridTemplateColumns:"1fr auto"}}>
-            <input type="text" placeholder="z. B. H\u00e4hnchen" value={watchSearch}
+            <input type="text" placeholder="z. B. Hu00e4hnchen" value={watchSearch}
               onChange={(e) => setWatchSearch(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addWatchItem()}
             />
-            <button type="button" onClick={addWatchItem}>+ Hinzuf\u00fcgen</button>
+            <button type="button" onClick={addWatchItem}>+ Hinzufu00fcgen</button>
           </div>
           {watchlist.length > 0 && (
             <>
               <ul className="recurring-list">
                 {watchlist.map((w) => (
-                  <li key={w.id}><span>\ud83d\udd14 {w.searchTerm}</span><button className="danger" onClick={() => removeWatchItem(w.id)}>\u2715</button></li>
+                  <li key={w.id}><span>ud83dudd14 {w.searchTerm}</span><button className="danger" onClick={() => removeWatchItem(w.id)}>u2715</button></li>
                 ))}
               </ul>
               <button type="button" onClick={searchWatchlist} disabled={watchLoading}>
-                {watchLoading ? "Suche..." : "Jetzt pr\u00fcfen"}
+                {watchLoading ? "Suche..." : "Jetzt pru00fcfen"}
               </button>
             </>
           )}
@@ -246,8 +246,8 @@ export default function OffersPage() {
             <ul className="live-offers-list" style={{marginTop:"0.5rem"}}>
               {watchResults.map((offer, i) => (
                 <li key={i}>
-                  <div><strong>{offer.market}</strong><p>{offer.title}</p><span className="muted">\ud83d\udd0d {offer.watchTerm}</span></div>
-                  <div className="offer-meta"><span>{Number.isFinite(offer.price) ? (\\ EUR`) : "n/a"}</span><a href={offer.url} target="_blank" rel="noreferrer">\u00d6ffnen</a></div>
+                  <div><strong>{offer.market}</strong><p>{offer.title}</p><span className="muted">ud83dudd0d {offer.watchTerm}</span></div>
+                  <div className="offer-meta"><span>{Number.isFinite(offer.price) ? `${offer.price.toFixed(2)} €` : "n/a"}</span><a href={offer.url} target="_blank" rel="noreferrer">u00d6ffnen</a></div>
                 </li>
               ))}
             </ul>
@@ -257,7 +257,7 @@ export default function OffersPage() {
 
       <div className="dashboard-grid" style={{marginTop:"1rem"}}>
         <section className="card">
-          <h2>\ud83c\udfea Meine Filialen</h2>
+          <h2>ud83cudfea Meine Filialen</h2>
           <p className="muted">Gespeicherte Filialen (bearbeiten in den <Link to="/settings">Einstellungen</Link>)</p>
           <div className="locations-grid">
             {MARKETS.map((market) => {
@@ -271,7 +271,7 @@ export default function OffersPage() {
                       <>
                         <p style={{margin:0}}><strong>{loc.branchName}</strong></p>
                         {loc.branchZip && <span className="muted">PLZ {loc.branchZip}, {loc.branchCity || ""}</span>}
-                        {loc.locationUrl && <a href={loc.locationUrl} target="_blank" rel="noreferrer">Angebote \u00f6ffnen</a>}
+                        {loc.locationUrl && <a href={loc.locationUrl} target="_blank" rel="noreferrer">Angebote u00f6ffnen</a>}
                       </>
                     ) : (
                       <p className="muted" style={{margin:0}}>Keine Filiale gespeichert</p>
@@ -291,10 +291,10 @@ export default function OffersPage() {
         </section>
 
         <section className="card">
-          <h2>\ud83d\udcb0 Preisvergleich</h2>
+          <h2>ud83dudcb0 Preisvergleich</h2>
           <div className="switch-row">
             {MARKETS.map((m) => (
-              <button key={m} type="button" className={\	ab \\} onClick={() => toggleMarket(m)}>{m}</button>
+              <button key={m} type="button" className={	ab } onClick={() => toggleMarket(m)}>{m}</button>
             ))}
           </div>
           <button type="button" onClick={loadComparison} disabled={loadingOffers}>
