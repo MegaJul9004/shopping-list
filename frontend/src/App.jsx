@@ -49,19 +49,19 @@ export default function App() {
 
   useEffect(() => {
     if (!session) return;
-    api(\/families/\/list\, {}, session.token)
+    api(`/families/${session.familyId}/list`, {}, session.token)
       .then((data) => setItems(data.items)).catch(() => {});
   }, [session]);
 
   useEffect(() => {
     if (!session) return;
-    api(\/families/\/recurring\, {}, session.token)
+    api(`/families/${session.familyId}/recurring`, {}, session.token)
       .then((data) => setRecurringItems(data.recurringItems || [])).catch(() => {});
   }, [session]);
 
   useEffect(() => {
     if (!session) return;
-    api(\/families/\/mini-lists\, {}, session.token)
+    api(`/families/${session.familyId}/mini-lists`, {}, session.token)
       .then((data) => setMiniLists(data.miniLists || [])).catch(() => {});
   }, [session]);
 
@@ -97,7 +97,7 @@ export default function App() {
   const addItem = async () => {
     if (!itemName.trim() || !session) return;
     try {
-      await api(\/families/\/items\, { method: "POST", body: JSON.stringify({ name: itemName.trim(), quantity: itemQty }) }, session.token);
+      await api(`/families/${session.familyId}/items`, { method: "POST", body: JSON.stringify({ name: itemName.trim(), quantity: itemQty }) }, session.token);
       setItemName(""); setItemQty(1);
     } catch (e) { setError(e.message); }
   };
@@ -105,14 +105,14 @@ export default function App() {
   const toggleItem = async (itemId, currentChecked) => {
     if (!session) return;
     try {
-      await api(\/families/\/items/\\, { method: "PATCH", body: JSON.stringify({ checked: !currentChecked }) }, session.token);
+      await api(`/families/${session.familyId}/items/${itemId}`, { method: "PATCH", body: JSON.stringify({ checked: !currentChecked }) }, session.token);
     } catch (e) { setError(e.message); }
   };
 
   const deleteItem = async (itemId) => {
     if (!session) return;
     try {
-      await api(\/families/\/items/\\, { method: "DELETE" }, session.token);
+      await api(`/families/${session.familyId}/items/${itemId}`, { method: "DELETE" }, session.token);
     } catch (e) { setError(e.message); }
   };
 
@@ -120,7 +120,7 @@ export default function App() {
     if (!recipeQuery.trim()) return;
     setLoadingRecipes(true);
     try {
-      const data = await api(\/recipes/search?q=\\);
+      const data = await api(`/recipes/search?q=${encodeURIComponent(recipeQuery)}`);
       setRecipes(data.recipes || []);
     } catch (e) { setError(e.message); }
     setLoadingRecipes(false);
@@ -130,7 +130,7 @@ export default function App() {
     if (selectedIngredients.length === 0) return;
     setLoadingRecipes(true);
     try {
-      const data = await api(\/recipes/by-ingredients?ingredients=\\);
+      const data = await api(`/recipes/by-ingredients?ingredients=${selectedIngredients.join(",")}`);
       setRecipes(data.recipes || []);
     } catch (e) { setError(e.message); }
     setLoadingRecipes(false);
@@ -139,9 +139,9 @@ export default function App() {
   const addRecurring = async () => {
     if (!recurName.trim() || !session) return;
     try {
-      await api(\/families/\/recurring\, { method: "POST", body: JSON.stringify({ name: recurName.trim(), quantity: recurQty, dayOfWeek: recurDay }) }, session.token);
+      await api(`/families/${session.familyId}/recurring`, { method: "POST", body: JSON.stringify({ name: recurName.trim(), quantity: recurQty, dayOfWeek: recurDay }) }, session.token);
       setRecurName(""); setRecurQty(1);
-      const data = await api(\/families/\/recurring\, {}, session.token);
+      const data = await api(`/families/${session.familyId}/recurring`, {}, session.token);
       setRecurringItems(data.recurringItems || []);
     } catch (e) { setError(e.message); }
   };
@@ -149,7 +149,7 @@ export default function App() {
   const deleteRecurring = async (itemId) => {
     if (!session) return;
     try {
-      await api(\/families/\/recurring/\\, { method: "DELETE" }, session.token);
+      await api(`/families/${session.familyId}/recurring/${itemId}`, { method: "DELETE" }, session.token);
       setRecurringItems((prev) => prev.filter((r) => r.id !== itemId));
     } catch (e) { setError(e.message); }
   };
@@ -157,9 +157,9 @@ export default function App() {
   const saveMiniList = async () => {
     if (!miniListName.trim() || miniListItems.length === 0 || !session) return;
     try {
-      await api(\/families/\/mini-lists\, { method: "POST", body: JSON.stringify({ name: miniListName.trim(), items: miniListItems }) }, session.token);
+      await api(`/families/${session.familyId}/mini-lists`, { method: "POST", body: JSON.stringify({ name: miniListName.trim(), items: miniListItems }) }, session.token);
       setMiniListName(""); setMiniListItems([]); setShowMiniListEditor(false);
-      const data = await api(\/families/\/mini-lists\, {}, session.token);
+      const data = await api(`/families/${session.familyId}/mini-lists`, {}, session.token);
       setMiniLists(data.miniLists || []);
     } catch (e) { setError(e.message); }
   };
@@ -167,7 +167,7 @@ export default function App() {
   const deleteMiniList = async (listId) => {
     if (!session) return;
     try {
-      await api(\/families/\/mini-lists/\\, { method: "DELETE" }, session.token);
+      await api(`/families/${session.familyId}/mini-lists/${listId}`, { method: "DELETE" }, session.token);
       setMiniLists((prev) => prev.filter((ml) => ml.id !== listId));
     } catch (e) { setError(e.message); }
   };
@@ -176,7 +176,7 @@ export default function App() {
     if (!session) return;
     for (const item of miniList.items) {
       try {
-        await api(\/families/\/items\, { method: "POST", body: JSON.stringify({ name: item.name, quantity: item.quantity }) }, session.token);
+        await api(`/families/${session.familyId}/items`, { method: "POST", body: JSON.stringify({ name: item.name, quantity: item.quantity }) }, session.token);
       } catch (e) { setError(e.message); }
     }
   };
@@ -357,3 +357,4 @@ export default function App() {
     </div>
   );
 }
+

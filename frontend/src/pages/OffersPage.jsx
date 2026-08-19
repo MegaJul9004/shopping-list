@@ -29,7 +29,7 @@ export default function OffersPage() {
     setLoadingLiveOffers(true);
     try {
       const offset = refresh ? 0 : liveOffersOffset;
-      const data = await api(\/offers/live?market=\&offset=\&limit=20\\);
+      const data = await api(`/offers/live?market=${liveMarketView}&offset=${offset}&limit=20${refreshParam}`);
       if (refresh) setLiveOffers(data.offers);
       else setLiveOffers((prev) => [...prev, ...data.offers]);
       setLiveOffersHasMore(data.hasMore);
@@ -48,7 +48,7 @@ export default function OffersPage() {
     if (!session) return;
     setLoadingOffers(true);
     try {
-      const data = await api(\/offers/compare?markets=\\, {}, session.token);
+      const data = await api(`/offers/compare?markets=${selectedMarkets.join(",")}`, {}, session.token);
       setOffersResult(data);
     } catch (e) { console.error(e); }
     setLoadingOffers(false);
@@ -60,7 +60,7 @@ export default function OffersPage() {
 
   useEffect(() => {
     if (!session) return;
-    api(\/families/\/branches\, {}, session.token)
+    api(`/families/${session.familyId}/branches`, {}, session.token)
       .then((data) => {
         const locs = {};
         for (const [market, branch] of Object.entries(data.branches || {})) locs[market] = branch;
@@ -72,7 +72,7 @@ export default function OffersPage() {
     const form = locationForms[market] || {};
     if (!form.branchName && !form.locationName) return;
     try {
-      const data = await api(\/families/\/branches/\\,
+      const data = await api(`/families/${session.familyId}/branches/${market}`,
         { method: "POST", body: JSON.stringify({
           branchName: form.branchName || form.locationName,
           branchCity: form.branchCity || "",
@@ -86,17 +86,17 @@ export default function OffersPage() {
 
   useEffect(() => {
     if (!session) return;
-    api(\/families/\/offer-watchlist\, {}, session.token)
+    api(`/families/${session.familyId}/offer-watchlist`, {}, session.token)
       .then((data) => setWatchlist(data.watchlist || [])).catch(() => {});
   }, [session]);
 
   const addWatchItem = async () => {
     if (!watchSearch.trim() || !session) return;
     try {
-      await api(\/families/\/offer-watchlist\,
+      await api(`/families/${session.familyId}/offer-watchlist`,
         { method: "POST", body: JSON.stringify({ searchTerm: watchSearch.trim() }) }, session.token);
       setWatchSearch("");
-      const data = await api(\/families/\/offer-watchlist\, {}, session.token);
+      const data = await api(`/families/${session.familyId}/offer-watchlist`, {}, session.token);
       setWatchlist(data.watchlist || []);
     } catch (e) { console.error(e); }
   };
@@ -104,7 +104,7 @@ export default function OffersPage() {
   const removeWatchItem = async (watchId) => {
     if (!session) return;
     try {
-      await api(\/families/\/offer-watchlist/\\, { method: "DELETE" }, session.token);
+      await api(`/families/${session.familyId}/offer-watchlist/${watchId}`, { method: "DELETE" }, session.token);
       setWatchlist((prev) => prev.filter((w) => w.id !== watchId));
     } catch (e) { console.error(e); }
   };
@@ -146,7 +146,7 @@ export default function OffersPage() {
   const exportCsv = async () => {
     if (!session) return;
     try {
-      const data = await api(\/offers/export?markets=\&format=csv\, {}, session.token);
+      const data = await api(`/offers/export?markets=${selectedMarkets.join(",")}&format=csv`, {}, session.token);
       const blob = new Blob([data.csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -182,7 +182,7 @@ export default function OffersPage() {
               <li key={i}>
                 <div><strong>{offer.market}</strong><p>{offer.title}</p></div>
                 <div className="offer-meta">
-                  <span>{Number.isFinite(offer.price) ? (\\ EUR\) : "Preis n/a"}</span>
+                  <span>{Number.isFinite(offer.price) ? (\\ EUR`) : "Preis n/a"}</span>
                   <a href={offer.url} target="_blank" rel="noreferrer">\u00d6ffnen</a>
                 </div>
               </li>
@@ -214,7 +214,7 @@ export default function OffersPage() {
             {offerSearchResults.map((offer, i) => (
               <li key={i}>
                 <div><strong>{offer.market}</strong><p>{offer.title}</p></div>
-                <div className="offer-meta"><span>{Number.isFinite(offer.price) ? (\\ EUR\) : "n/a"}</span><a href={offer.url} target="_blank" rel="noreferrer">\u00d6ffnen</a></div>
+                <div className="offer-meta"><span>{Number.isFinite(offer.price) ? (\\ EUR`) : "n/a"}</span><a href={offer.url} target="_blank" rel="noreferrer">\u00d6ffnen</a></div>
               </li>
             ))}
           </ul>
@@ -247,7 +247,7 @@ export default function OffersPage() {
               {watchResults.map((offer, i) => (
                 <li key={i}>
                   <div><strong>{offer.market}</strong><p>{offer.title}</p><span className="muted">\ud83d\udd0d {offer.watchTerm}</span></div>
-                  <div className="offer-meta"><span>{Number.isFinite(offer.price) ? (\\ EUR\) : "n/a"}</span><a href={offer.url} target="_blank" rel="noreferrer">\u00d6ffnen</a></div>
+                  <div className="offer-meta"><span>{Number.isFinite(offer.price) ? (\\ EUR`) : "n/a"}</span><a href={offer.url} target="_blank" rel="noreferrer">\u00d6ffnen</a></div>
                 </li>
               ))}
             </ul>
@@ -319,3 +319,4 @@ export default function OffersPage() {
     </div>
   );
 }
+

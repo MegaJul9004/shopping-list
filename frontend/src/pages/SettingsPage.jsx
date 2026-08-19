@@ -28,7 +28,7 @@ export default function SettingsPage() {
   const loadBranches = useCallback(async () => {
     if (!session) return;
     try {
-      const data = await api(\/families/\/branches\, {}, session.token);
+      const data = await api(`/families/${session.familyId}/branches`, {}, session.token);
       setBranches(data.branches || {});
     } catch {}
   }, [session]);
@@ -44,26 +44,26 @@ export default function SettingsPage() {
   const saveBranch = async (market) => {
     const form = branchForms[market] || {};
     if (!form.branchName && !form.branchZip) {
-      setBranchMessage(\Bitte mindestens Filialnamen oder PLZ für \ eingeben.\);
+      setBranchMessage(\Bitte mindestens Filialnamen oder PLZ für \ eingeben.`);
       return;
     }
     setBranchMessage("");
     try {
-      const data = await api(\/families/\/branches/\\,
+      const data = await api(`/families/${session.familyId}/branches/${market}`,
         { method: "POST", body: JSON.stringify(form) }, session.token);
       if (data.branch) {
         setBranches((prev) => ({ ...prev, [market]: data.branch }));
-        setBranchMessage(\\: Gespeichert ✓\);
+        setBranchMessage(\\: Gespeichert ✓`);
       }
-    } catch (e) { setBranchMessage(\Fehler: \\); }
+    } catch (e) { setBranchMessage(\Fehler: \`); }
   };
 
   const removeBranch = async (market) => {
     try {
-      await api(\/families/\/branches/\\, { method: "DELETE" }, session.token);
+      await api(`/families/${session.familyId}/branches/${market}`, { method: "DELETE" }, session.token);
       setBranches((prev) => { const n = { ...prev }; delete n[market]; return n; });
-      setBranchMessage(\\: Entfernt\);
-    } catch (e) { setBranchMessage(\Fehler: \\); }
+      setBranchMessage(\\: Entfernt`);
+    } catch (e) { setBranchMessage(\Fehler: \`); }
   };
 
   const handleBranchZipLookup = (market, zip) => {
@@ -110,7 +110,7 @@ export default function SettingsPage() {
             {THEME_PRESETS.map((preset) => (
               <button key={preset.name} type="button" className="ghost"
                 onClick={() => updateTheme(preset)}
-                style={{borderLeft:\4px solid \\, background: preset.bgTop, color: "#1f2a37"}}
+                style={{borderLeft:\4px solid \`, background: preset.bgTop, color: "#1f2a37"}}
               >{preset.name}</button>
             ))}
           </div>
@@ -222,3 +222,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+
