@@ -1,84 +1,90 @@
-{
-  "families": [
-    {
-      "id": "2ZUKTZ",
-      "name": "Test Familie",
-      "createdAt": "2026-08-17T08:05:02.889Z"
-    },
-    {
-      "id": "L5CKPE",
-      "name": "Test Familie",
-      "createdAt": "2026-08-17T08:05:03.477Z"
-    },
-    {
-      "id": "6TSYZE",
-      "name": "Test Familie",
-      "createdAt": "2026-08-17T10:11:09.543Z"
-    },
-    {
-      "id": "NAXF8N",
-      "name": "Export Test",
-      "createdAt": "2026-08-17T10:11:15.412Z"
-    },
-    {
-      "id": "3AG9X5",
-      "name": "Csv Test",
-      "createdAt": "2026-08-17T10:11:42.481Z"
-    }
-  ],
-  "users": [
-    {
-      "id": "vPxARB3t9v4_",
-      "familyId": "2ZUKTZ",
-      "username": "test",
-      "passwordHash": "$2a$10$1BFmCy89vyv7ehzYxgCYge8ZudilKXJYpHuZeQWK4ZE0091XxOXHS",
-      "createdAt": "2026-08-17T08:05:02.958Z"
-    },
-    {
-      "id": "8_AOXkkK9FQn",
-      "familyId": "L5CKPE",
-      "username": "test",
-      "passwordHash": "$2a$10$aobWHHRIdQ9ceSpdTXlRsO980jDbVyHYRd8w8UD8MdR38AzFI9DWC",
-      "createdAt": "2026-08-17T08:05:03.547Z"
-    },
-    {
-      "id": "oFAh9IEqK6ab",
-      "familyId": "6TSYZE",
-      "username": "testuser",
-      "passwordHash": "$2a$10$x2UADsuOygtSiL2zZIW3VOI6rRZMKzuqEhZPVtahZwA2zTzkMwBwe",
-      "createdAt": "2026-08-17T10:11:09.611Z"
-    },
-    {
-      "id": "R_Em02qa2zXZ",
-      "familyId": "NAXF8N",
-      "username": "alice",
-      "passwordHash": "$2a$10$a8efhJzB0Zw.W/2mVg456.rSrv4XxaVGigAzcNERaSPK9yo0a/K/2",
-      "createdAt": "2026-08-17T10:11:15.488Z"
-    },
-    {
-      "id": "iOtESHf1V-Li",
-      "familyId": "3AG9X5",
-      "username": "bob",
-      "passwordHash": "$2a$10$4gGNaVLHdYraBhzka1OalOHCT/pl.9s1DR9T/WDUyWMplJ1PWh8U6",
-      "createdAt": "2026-08-17T10:11:42.552Z"
-    }
-  ],
-  "shoppingItems": [
-    {
-      "id": "hQGbfXMeHE",
-      "familyId": "L5CKPE",
-      "name": "Brot",
-      "quantity": 1,
-      "checked": true,
-      "createdAt": "2026-08-17T08:05:55.595Z"
-    },
-    {
-      "id": "Wv6gZf9hYV",
-      "familyId": "NAXF8N",
-      "name": "Nudeln",
-      "quantity": 3,
-      "checked": false,
-      "createdAt": "2026-08-17T10:11:16.089Z"
-    }
-  ]
+﻿{
+    "families":  [
+                     {
+                         "id":  "2ZUKTZ",
+                         "name":  "Test Familie",
+                         "createdAt":  "2026-08-17T08:05:02.889Z"
+                     },
+                     {
+                         "id":  "L5CKPE",
+                         "name":  "Test Familie",
+                         "createdAt":  "2026-08-17T08:05:03.477Z"
+                     },
+                     {
+                         "id":  "6TSYZE",
+                         "name":  "Test Familie",
+                         "createdAt":  "2026-08-17T10:11:09.543Z"
+                     },
+                     {
+                         "id":  "NAXF8N",
+                         "name":  "Export Test",
+                         "createdAt":  "2026-08-17T10:11:15.412Z"
+                     },
+                     {
+                         "id":  "3AG9X5",
+                         "name":  "Csv Test",
+                         "createdAt":  "2026-08-17T10:11:42.481Z"
+                     }
+                 ],
+    "users":  [
+                  {
+                      "id":  "vPxARB3t9v4_",
+                      "familyId":  "2ZUKTZ",
+                      "username":  "test",
+                      "passwordHash":  "$2a$10$1BFmCy89vyv7ehzYxgCYge8ZudilKXJYpHuZeQWK4ZE0091XxOXHS",
+                      "createdAt":  "2026-08-17T08:05:02.958Z"
+                  },
+                  {
+                      "id":  "8_AOXkkK9FQn",
+                      "familyId":  "L5CKPE",
+                      "username":  "test",
+                      "passwordHash":  "$2a$10$aobWHHRIdQ9ceSpdTXlRsO980jDbVyHYRd8w8UD8MdR38AzFI9DWC",
+                      "createdAt":  "2026-08-17T08:05:03.547Z"
+                  },
+                  {
+                      "id":  "oFAh9IEqK6ab",
+                      "familyId":  "6TSYZE",
+                      "username":  "testuser",
+                      "passwordHash":  "$2a$10$x2UADsuOygtSiL2zZIW3VOI6rRZMKzuqEhZPVtahZwA2zTzkMwBwe",
+                      "createdAt":  "2026-08-17T10:11:09.611Z"
+                  },
+                  {
+                      "id":  "R_Em02qa2zXZ",
+                      "familyId":  "NAXF8N",
+                      "username":  "alice",
+                      "passwordHash":  "$2a$10$a8efhJzB0Zw.W/2mVg456.rSrv4XxaVGigAzcNERaSPK9yo0a/K/2",
+                      "createdAt":  "2026-08-17T10:11:15.488Z"
+                  },
+                  {
+                      "id":  "iOtESHf1V-Li",
+                      "familyId":  "3AG9X5",
+                      "username":  "bob",
+                      "passwordHash":  "$2a$10$4gGNaVLHdYraBhzka1OalOHCT/pl.9s1DR9T/WDUyWMplJ1PWh8U6",
+                      "createdAt":  "2026-08-17T10:11:42.552Z"
+                  }
+              ],
+    "shoppingItems":  [
+                          {
+                              "id":  "hQGbfXMeHE",
+                              "familyId":  "L5CKPE",
+                              "name":  "Brot",
+                              "quantity":  1,
+                              "checked":  true,
+                              "createdAt":  "2026-08-17T08:05:55.595Z"
+                          },
+                          {
+                              "id":  "Wv6gZf9hYV",
+                              "familyId":  "NAXF8N",
+                              "name":  "Nudeln",
+                              "quantity":  3,
+                              "checked":  false,
+                              "createdAt":  "2026-08-17T10:11:16.089Z"
+                          }
+                      ],
+    "recurringItems":  [
+
+                       ],
+    "familyLocations":  [
+
+                        ]
 }

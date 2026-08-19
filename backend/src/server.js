@@ -8,17 +8,22 @@ import { customAlphabet, nanoid } from "nanoid";
 import { Server } from "socket.io";
 import {
   addItem,
+  addRecurringItem,
   createFamily,
   createUser,
   deleteItem,
+  deleteRecurringItem,
   getFamilyById,
+  getFamilyLocations,
   getUserByFamilyAndUsername,
   getUserById,
   getItemsByFamily,
+  getRecurringItemsByFamily,
+  setFamilyLocation,
   updateItem
 } from "./db.js";
 import { buildExportByMarket, compareMarkets } from "./offers.js";
-import { getLiveOffers, getMarketOffers, getSupportedMarkets } from "./liveOffers.js";
+import { getDefaultMarketSource, getLiveOffers, getMarketOffers, getSupportedMarkets } from "./liveOffers.js";
 import { searchChefkoch } from "./recipeSearch.js";
 
 const app = express();
@@ -298,6 +303,102 @@ app.delete("/api/families/:familyId/items/:itemId", authMiddleware, (req, res) =
 
   emitItems(familyId);
   return res.json({ ok: true });
+});
+
+// ── Wiederkehrende Artikel ───────────────────────────────────────────
+app.get("/api/families/:familyId/recurring", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed for this family" });
+  }
+
+  return res.json({ recurringItems: getRecurringItemsByFamily(familyId) });
+});
+
+app.post("/api/families/:familyId/recurring", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  const name = String(req.body?.name || "").trim();
+  const rawQuantity = Number(req.body?.quantity ?? 1);
+  const quantity = Number.isFinite(rawQuantity) && rawQuantity > 0 ? Math.floor(rawQuantity) : 1;
+  const dayOfWeek =
+    Number.isInteger(Number(req.body?.dayOfWeek)) &&
+    Number(req.body?.dayOfWeek) >= 0 &&
+    Number(req.body?.dayOfWeek) <= 6
+      ? Number(req.body.dayOfWeek)
+      : 1;
+
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed for this family" });
+  }
+
+  if (!name) {
+    return res.status(400).json({ error: "Item name is required" });
+  }
+
+  addRecurringItem({ id: nanoid(10), familyId, name, quantity, dayOfWeek });
+
+  return res.status(201).json({ ok: true });
+});
+
+app.delete(
+  "/api/families/:familyId/recurring/:itemId",
+  authMiddleware,
+  (req, res) => {
+    const familyId = String(req.params.familyId || "").toUpperCase();
+    const itemId = String(req.params.itemId || "");
+
+    if (req.auth.familyId !== familyId) {
+      return res.status(403).json({ error: "Not allowed for this family" });
+    }
+
+    const deleted = deleteRecurringItem({ itemId, familyId });
+    if (!deleted) {
+      return res.status(404).json({ error: "Recurring item not found" });
+    }
+
+    return res.json({ ok: true });
+  }
+);
+
+// ── Markt-Standorte ─────────────────────────────────────────────────
+app.get("/api/families/:familyId/locations", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed for this family" });
+  }
+
+  return res.json({ locations: getFamilyLocations(familyId) });
+});
+
+app.post("/api/families/:familyId/locations", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  const market = String(req.body?.market || "").trim().toUpperCase();
+  const locationName = String(req.body?.locationName || "").trim();
+  const locationUrl = String(req.body?.locationUrl || "").trim();
+
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed for this family" });
+  }
+
+  if (!market || !locationName) {
+    return res.status(400).json({ error: "market and locationName are required" });
+  }
+
+  const saved = setFamilyLocation({ familyId, market, locationName, locationUrl });
+  return res.status(201).json({ location: saved });
+});
+
+app.get("/api/offers/locations", (_req, res) => {
+  const locations = {};
+  for (const market of getSupportedMarkets()) {
+    const defaultUrl = getDefaultMarketSource(market);
+    if (defaultUrl) {
+      locations[market] = [{ name: market, url: defaultUrl }];
+    }
+  }
+  return res.json({ locations });
 });
 
 app.get("/api/recipes/search", async (req, res) => {
