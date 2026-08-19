@@ -1,10 +1,16 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
 import { Link } from "react-router-dom";
 import { useApp, api } from "./context/AppContext";
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:4000";
-const socket = io(SOCKET_URL, { autoConnect: true });
+const socketRef = { current: null };
+function getSocket() {
+  if (!socketRef.current) {
+    socketRef.current = io(SOCKET_URL, { autoConnect: false });
+  }
+  return socketRef.current;
+}
 
 const DAY_NAMES = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
 
@@ -41,10 +47,15 @@ export default function App() {
 
   useEffect(() => {
     if (!session) return;
+    const socket = getSocket();
+    socket.connect();
     socket.emit("joinFamily", { token: session.token });
     const onItemsSnapshot = (nextItems) => setItems(nextItems);
     socket.on("itemsSnapshot", onItemsSnapshot);
-    return () => { socket.off("itemsSnapshot", onItemsSnapshot); };
+    return () => {
+      socket.off("itemsSnapshot", onItemsSnapshot);
+      socket.disconnect();
+    };
   }, [session]);
 
   useEffect(() => {

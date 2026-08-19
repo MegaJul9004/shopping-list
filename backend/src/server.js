@@ -28,8 +28,7 @@ import {
   getItemsByFamily,
   getRecurringItemsByFamily,
   removeFromOfferWatchlist,
-  saveFamilyBranchLocation,
-  setFamilyLocation,
+  saveFamilyBranchLocation
   setFamilySettings,
   smartAddItem,
   updateItem

@@ -40,6 +40,7 @@ export default function SettingsPage() {
   const handleDuplicateChange = async (behavior) => {
     setSaving(true);
     await updateSettings({ duplicateBehavior: behavior });
+    try { await api(`/families/${session.familyId}/settings`, { method: "POST", body: JSON.stringify({ duplicateBehavior: behavior }) }, session.token); } catch (e) { console.error(e); }
     setSaving(false);
   };
 

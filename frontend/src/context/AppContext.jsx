@@ -17,6 +17,9 @@ export async function api(endpoint, options = {}, token = null) {
 
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      localStorage.removeItem("shopping_session");
+    }
     throw new Error(errData.message || `Fehler ${response.status}`);
   }
 
@@ -28,7 +31,13 @@ const AppContext = createContext();
 export function AppProvider({ children }) {
   const [session, setSession] = useState(() => {
     const saved = localStorage.getItem("shopping_session");
-    return saved ? JSON.parse(saved) : null;
+    if (!saved) return null;
+    try {
+      const parsed = JSON.parse(saved);
+      if (!parsed.token) return null;
+      // Token-Expiry wird beim naechsten API-Call geprueft (401)
+      return parsed;
+    } catch { return null; }
   });
 
   const [settings, setSettings] = useState(() => {
