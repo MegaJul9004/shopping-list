@@ -1,0 +1,453 @@
+import "dotenv/config";
+import bcrypt from "bcryptjs";
+import cors from "cors";
+import express from "express";
+import http from "node:http";
+import jwt from "jsonwebtoken";
+import { customAlphabet, nanoid } from "nanoid";
+import { Server } from "socket.io";
+import {
+  addItem,
+  createFamily,
+  createUser,
+  deleteItem,
+  getFamilyById,
+  getUserByFamilyAndUsername,
+  getUserById,
+  getItemsByFamily,
+  updateItem
+} from "./db.js";
+import { buildExportByMarket, compareMarkets } from "./offers.js";
+import { getLiveOffers, getMarketOffers, getSupportedMarkets } from "./liveOffers.js";
+import { searchChefkoch } from "./recipeSearch.js";
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: process.env.FRONTEND_ORIGIN || "http://localhost:5173",
+    methods: ["GET", "POST", "PATCH", "DELETE"]
+  }
+});
+
+const familyCode = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 6);
+const jwtSecret = process.env.JWT_SECRET || "dev-secret-change-me";
+
+app.use(
+  cors({
+    origin: process.env.FRONTEND_ORIGIN || "http://localhost:5173"
+  })
+);
+app.use(express.json());
+
+io.on("connection", (socket) => {
+  socket.on("joinFamily", ({ token }) => {
+    try {
+      const payload = jwt.verify(String(token || ""), jwtSecret);
+      socket.join(payload.familyId);
+    } catch {
+      socket.emit("authError", "Invalid socket token");
+    }
+  });
+});
+
+function emitItems(familyId) {
+  const items = getItemsByFamily(familyId);
+  io.to(familyId).emit("itemsSnapshot", items);
+}
+
+app.get("/api/health", (_req, res) => {
+  res.json({ ok: true });
+});
+
+function issueToken(user) {
+  return jwt.sign(
+    {
+      userId: user.id,
+      familyId: user.familyId,
+      username: user.username
+    },
+    jwtSecret,
+    { expiresIn: "30d" }
+  );
+}
+
+function authMiddleware(req, res, next) {
+  const auth = String(req.headers.authorization || "");
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+
+  if (!token) {
+    return res.status(401).json({ error: "Authorization token missing" });
+  }
+
+  try {
+    const payload = jwt.verify(token, jwtSecret);
+    req.auth = payload;
+    return next();
+  } catch {
+    return res.status(401).json({ error: "Invalid or expired token" });
+  }
+}
+
+app.post("/api/auth/register", async (req, res) => {
+  const mode = String(req.body?.mode || "").toLowerCase();
+  const familyName = String(req.body?.familyName || "").trim();
+  const familyIdInput = String(req.body?.familyId || "").trim().toUpperCase();
+  const username = String(req.body?.username || "").trim().toLowerCase();
+  const password = String(req.body?.password || "");
+
+  if (!["create", "join"].includes(mode)) {
+    return res.status(400).json({ error: "mode must be create or join" });
+  }
+
+  if (!username || !password) {
+    return res.status(400).json({ error: "username and password are required" });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ error: "Password must be at least 6 characters" });
+  }
+
+  let family;
+  let familyId;
+
+  if (mode === "create") {
+    if (!familyName) {
+      return res.status(400).json({ error: "familyName is required for create mode" });
+    }
+    familyId = familyCode();
+    createFamily({ id: familyId, name: familyName });
+    family = getFamilyById(familyId);
+  } else {
+    if (!familyIdInput) {
+      return res.status(400).json({ error: "familyId is required for join mode" });
+    }
+    family = getFamilyById(familyIdInput);
+    familyId = familyIdInput;
+    if (!family) {
+      return res.status(404).json({ error: "Family not found" });
+    }
+  }
+
+  const existing = getUserByFamilyAndUsername(familyId, username);
+  if (existing) {
+    return res.status(409).json({ error: "Username already exists in this family" });
+  }
+
+  const userId = nanoid(12);
+  const passwordHash = await bcrypt.hash(password, 10);
+  createUser({ id: userId, familyId, username, passwordHash });
+
+  const token = issueToken({ id: userId, familyId, username });
+  return res.status(201).json({
+    token,
+    user: {
+      id: userId,
+      username,
+      familyId,
+      familyName: family.name
+    }
+  });
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  const familyId = String(req.body?.familyId || "").trim().toUpperCase();
+  const username = String(req.body?.username || "").trim().toLowerCase();
+  const password = String(req.body?.password || "");
+
+  if (!familyId || !username || !password) {
+    return res.status(400).json({ error: "familyId, username and password are required" });
+  }
+
+  const family = getFamilyById(familyId);
+  if (!family) {
+    return res.status(404).json({ error: "Family not found" });
+  }
+
+  const user = getUserByFamilyAndUsername(familyId, username);
+  if (!user) {
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) {
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  const token = issueToken(user);
+  return res.json({
+    token,
+    user: {
+      id: user.id,
+      username: user.username,
+      familyId,
+      familyName: family.name
+    }
+  });
+});
+
+app.get("/api/auth/me", authMiddleware, (req, res) => {
+  const user = getUserById(req.auth.userId);
+  const family = getFamilyById(req.auth.familyId);
+
+  if (!user || !family) {
+    return res.status(401).json({ error: "Session no longer valid" });
+  }
+
+  return res.json({
+    user: {
+      id: user.id,
+      username: user.username,
+      familyId: user.familyId,
+      familyName: family.name
+    }
+  });
+});
+
+app.get("/api/families/:familyId/list", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed for this family" });
+  }
+
+  if (!getFamilyById(familyId)) {
+    return res.status(404).json({ error: "Family not found" });
+  }
+
+  return res.json({ items: getItemsByFamily(familyId) });
+});
+
+app.post("/api/families/:familyId/items", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  const name = String(req.body?.name || "").trim();
+  const rawQuantity = Number(req.body?.quantity ?? 1);
+  const quantity = Number.isFinite(rawQuantity) && rawQuantity > 0 ? Math.floor(rawQuantity) : 1;
+
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed for this family" });
+  }
+
+  if (!getFamilyById(familyId)) {
+    return res.status(404).json({ error: "Family not found" });
+  }
+
+  if (!name) {
+    return res.status(400).json({ error: "Item name is required" });
+  }
+
+  addItem({ id: nanoid(10), familyId, name, quantity });
+  emitItems(familyId);
+
+  return res.status(201).json({ ok: true });
+});
+
+app.patch("/api/families/:familyId/items/:itemId", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  const itemId = String(req.params.itemId || "");
+
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed for this family" });
+  }
+
+  if (!getFamilyById(familyId)) {
+    return res.status(404).json({ error: "Family not found" });
+  }
+
+  const nextChecked =
+    typeof req.body?.checked === "boolean" ? req.body.checked : undefined;
+  const nextName =
+    typeof req.body?.name === "string" ? req.body.name.trim() : undefined;
+  const nextQuantity =
+    Number.isFinite(Number(req.body?.quantity)) && Number(req.body?.quantity) > 0
+      ? Math.floor(Number(req.body.quantity))
+      : undefined;
+
+  const result = updateItem({
+    itemId,
+    familyId,
+    name: nextName,
+    quantity: nextQuantity,
+    checked: nextChecked
+  });
+
+  if (!result) {
+    return res.status(404).json({ error: "Item not found" });
+  }
+
+  emitItems(familyId);
+  return res.json({ ok: true });
+});
+
+app.delete("/api/families/:familyId/items/:itemId", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  const itemId = String(req.params.itemId || "");
+
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed for this family" });
+  }
+
+  if (!getFamilyById(familyId)) {
+    return res.status(404).json({ error: "Family not found" });
+  }
+
+  const deleted = deleteItem({ itemId, familyId });
+  if (!deleted) {
+    return res.status(404).json({ error: "Item not found" });
+  }
+
+  emitItems(familyId);
+  return res.json({ ok: true });
+});
+
+app.get("/api/recipes/search", async (req, res) => {
+  const query = String(req.query.q || "").trim();
+  if (!query) {
+    return res.status(400).json({ error: "Query q is required" });
+  }
+
+  try {
+    const recipes = await searchChefkoch(query);
+    return res.json({ recipes });
+  } catch (error) {
+    return res.status(502).json({
+      error: "Chefkoch search is currently unavailable",
+      detail: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+app.get("/api/recipes/by-ingredients", async (req, res) => {
+  const ingredientsRaw = String(req.query.ingredients || "");
+  const ingredients = ingredientsRaw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  if (ingredients.length === 0) {
+    return res.status(400).json({ error: "At least one ingredient is required" });
+  }
+
+  const searchQuery = ingredients.slice(0, 5).join(" ");
+  try {
+    const recipes = await searchChefkoch(searchQuery);
+    return res.json({
+      ingredients,
+      recipes
+    });
+  } catch (error) {
+    return res.status(502).json({
+      error: "Chefkoch search is currently unavailable",
+      detail: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+app.get("/api/offers/markets", (_req, res) => {
+  return res.json({ markets: getSupportedMarkets() });
+});
+
+app.get("/api/offers/live", async (req, res) => {
+  const market = String(req.query.market || "ALL").toUpperCase();
+  const offset = Number(req.query.offset || 0);
+  const limit = Number(req.query.limit || 20);
+  const forceRefresh = String(req.query.refresh || "0") === "1";
+
+  const payload = await getLiveOffers({
+    market,
+    offset,
+    limit,
+    forceRefresh
+  });
+
+  return res.json(payload);
+});
+
+app.get("/api/offers/compare", authMiddleware, async (req, res) => {
+  const markets = String(req.query.markets || "")
+    .split(",")
+    .map((entry) => entry.trim().toUpperCase())
+    .filter(Boolean);
+
+  const items = getItemsByFamily(req.auth.familyId);
+  const livePairs = await Promise.all(
+    markets.map(async (market) => {
+      const offers = await getMarketOffers(market, { forceRefresh: false });
+      return [market, offers];
+    })
+  );
+
+  const liveOffersByMarket = Object.fromEntries(livePairs);
+  const comparison = compareMarkets(items, markets, liveOffersByMarket);
+  return res.json(comparison);
+});
+
+app.get("/api/offers/export", authMiddleware, async (req, res) => {
+  const markets = String(req.query.markets || "")
+    .split(",")
+    .map((entry) => entry.trim().toUpperCase())
+    .filter(Boolean);
+
+  const items = getItemsByFamily(req.auth.familyId);
+  const livePairs = await Promise.all(
+    markets.map(async (market) => {
+      const offers = await getMarketOffers(market, { forceRefresh: false });
+      return [market, offers];
+    })
+  );
+  const liveOffersByMarket = Object.fromEntries(livePairs);
+  const comparison = compareMarkets(items, markets, liveOffersByMarket);
+  const grouped = buildExportByMarket(comparison);
+
+  const rows = [];
+  for (const [market, marketItems] of Object.entries(grouped)) {
+    for (const item of marketItems) {
+      rows.push({
+        market,
+        itemName: item.itemName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice,
+        source: item.source
+      });
+    }
+  }
+
+  const csvHeader = "market,item,quantity,unitPrice,totalPrice,source";
+  const csvRows = rows.map((entry) => {
+    const escapedName = `"${String(entry.itemName).replaceAll('"', '""')}"`;
+    return [
+      entry.market,
+      escapedName,
+      entry.quantity,
+      entry.unitPrice ?? "",
+      entry.totalPrice ?? "",
+      entry.source ?? ""
+    ].join(",");
+  });
+
+  const csv = [csvHeader, ...csvRows].join("\n");
+  const format = String(req.query.format || "json").toLowerCase();
+
+  if (format === "csv") {
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=einkauf-nach-markt.csv"
+    );
+    return res.send(csv);
+  }
+
+  return res.json({
+    generatedAt: new Date().toISOString(),
+    recommendedMarket: comparison.recommendation?.market || null,
+    rows,
+    csv
+  });
+});
+
+const port = Number(process.env.PORT || 4000);
+server.listen(port, () => {
+  // eslint-disable-next-line no-console
+  console.log(`API listening on http://localhost:${port}`);
+});
