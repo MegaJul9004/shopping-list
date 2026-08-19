@@ -1,10 +1,11 @@
 ﻿import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useApp, api } from "../context/AppContext";
 
 const MARKETS = ["LIDL", "EDEKA", "ALDI", "REWE"];
 
-export default function OffersPage({ session, theme }) {
-  const { settings } = useApp();
+export default function OffersPage() {
+  const { session, theme } = useApp();
   const [liveMarketView, setLiveMarketView] = useState("ALL");
   const [liveOffers, setLiveOffers] = useState([]);
   const [liveOffersHasMore, setLiveOffersHasMore] = useState(false);
@@ -28,7 +29,6 @@ export default function OffersPage({ session, theme }) {
     setLoadingLiveOffers(true);
     try {
       const offset = refresh ? 0 : liveOffersOffset;
-      const refreshParam = refresh ? "&refresh=1" : "";
       const data = await api(\/offers/live?market=\&offset=\&limit=20\\);
       if (refresh) setLiveOffers(data.offers);
       else setLiveOffers((prev) => [...prev, ...data.offers]);
@@ -58,15 +58,12 @@ export default function OffersPage({ session, theme }) {
     setSelectedMarkets((prev) => prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]);
   };
 
-  // Load branches
   useEffect(() => {
     if (!session) return;
     api(\/families/\/branches\, {}, session.token)
       .then((data) => {
         const locs = {};
-        for (const [market, branch] of Object.entries(data.branches || {})) {
-          locs[market] = branch;
-        }
+        for (const [market, branch] of Object.entries(data.branches || {})) locs[market] = branch;
         setLocations(locs);
       }).catch(() => {});
   }, [session]);
@@ -86,6 +83,7 @@ export default function OffersPage({ session, theme }) {
       if (data.branch) setLocations((prev) => ({ ...prev, [market]: data.branch }));
     } catch (e) { console.error(e); }
   };
+
   useEffect(() => {
     if (!session) return;
     api(\/families/\/offer-watchlist\, {}, session.token)
@@ -163,11 +161,15 @@ export default function OffersPage({ session, theme }) {
       <div className="hero">
         <p className="eyebrow">Angebote</p>
         <h1>Markt-Angebote durchsuchen & vergleichen</h1>
+        <div style={{display:"flex",gap:"0.5rem",marginTop:"0.6rem"}}>
+          <Link to="/" className="btn-inline">\u2190 Zur\u00fcck</Link>
+          <Link to="/settings" className="btn-inline">\u2699\ufe0f Einstellungen</Link>
+        </div>
       </div>
 
       <div className="dashboard-grid wide" style={{marginTop:"1.4rem"}}>
         <section className="card">
-          <h2>📰 Live-Angebote</h2>
+          <h2>\ud83d\udcf0 Live-Angebote</h2>
           <div className="live-controls">
             <label>Ansicht<select value={liveMarketView} onChange={(e) => { setLiveMarketView(e.target.value); setLiveOffersOffset(0); }}>
               <option value="ALL">Alle M\u00e4rkte</option>
@@ -178,10 +180,7 @@ export default function OffersPage({ session, theme }) {
           <ul className="live-offers-list">
             {liveOffers.map((offer, i) => (
               <li key={i}>
-                <div>
-                  <strong>{offer.market}</strong>
-                  <p>{offer.title}</p>
-                </div>
+                <div><strong>{offer.market}</strong><p>{offer.title}</p></div>
                 <div className="offer-meta">
                   <span>{Number.isFinite(offer.price) ? (\\ EUR\) : "Preis n/a"}</span>
                   <a href={offer.url} target="_blank" rel="noreferrer">\u00d6ffnen</a>
@@ -197,7 +196,7 @@ export default function OffersPage({ session, theme }) {
         </section>
 
         <section className="card">
-          <h2>🔍 Angebotssuche</h2>
+          <h2>\ud83d\udd0d Angebotssuche</h2>
           <p className="muted">Durchsuche alle aktuellen Angebote nach Stichwort</p>
           <div className="add-form" style={{gridTemplateColumns:"1fr auto"}}>
             <input type="text" placeholder="z. B. H\u00e4hnchen, Milch..." value={offerSearch}
@@ -213,7 +212,7 @@ export default function OffersPage({ session, theme }) {
           )}
           <ul className="live-offers-list">
             {offerSearchResults.map((offer, i) => (
-              <li key={sr-\}>
+              <li key={i}>
                 <div><strong>{offer.market}</strong><p>{offer.title}</p></div>
                 <div className="offer-meta"><span>{Number.isFinite(offer.price) ? (\\ EUR\) : "n/a"}</span><a href={offer.url} target="_blank" rel="noreferrer">\u00d6ffnen</a></div>
               </li>
@@ -222,7 +221,7 @@ export default function OffersPage({ session, theme }) {
         </section>
 
         <section className="card">
-          <h2>👀 Angebots-Watchlist</h2>
+          <h2>\ud83d\udc40 Angebots-Watchlist</h2>
           <p className="muted">Suchbegriffe festlegen und auf Angebote lauschen</p>
           <div className="add-form" style={{gridTemplateColumns:"1fr auto"}}>
             <input type="text" placeholder="z. B. H\u00e4hnchen" value={watchSearch}
@@ -235,10 +234,7 @@ export default function OffersPage({ session, theme }) {
             <>
               <ul className="recurring-list">
                 {watchlist.map((w) => (
-                  <li key={w.id}>
-                    <span>🔔 {w.searchTerm}</span>
-                    <button className="danger" onClick={() => removeWatchItem(w.id)}>✕</button>
-                  </li>
+                  <li key={w.id}><span>\ud83d\udd14 {w.searchTerm}</span><button className="danger" onClick={() => removeWatchItem(w.id)}>\u2715</button></li>
                 ))}
               </ul>
               <button type="button" onClick={searchWatchlist} disabled={watchLoading}>
@@ -249,8 +245,8 @@ export default function OffersPage({ session, theme }) {
           {watchResults.length > 0 && (
             <ul className="live-offers-list" style={{marginTop:"0.5rem"}}>
               {watchResults.map((offer, i) => (
-                <li key={wr-\}>
-                  <div><strong>{offer.market}</strong><p>{offer.title}</p><span className="muted">🔍 {offer.watchTerm}</span></div>
+                <li key={i}>
+                  <div><strong>{offer.market}</strong><p>{offer.title}</p><span className="muted">\ud83d\udd0d {offer.watchTerm}</span></div>
                   <div className="offer-meta"><span>{Number.isFinite(offer.price) ? (\\ EUR\) : "n/a"}</span><a href={offer.url} target="_blank" rel="noreferrer">\u00d6ffnen</a></div>
                 </li>
               ))}
@@ -261,8 +257,8 @@ export default function OffersPage({ session, theme }) {
 
       <div className="dashboard-grid" style={{marginTop:"1rem"}}>
         <section className="card">
-          <h2>🏪 Meine Filialen</h2>
-          <p className="muted">Gespeicherte Filial-Standorte (bearbeiten in den Einstellungen)</p>
+          <h2>\ud83c\udfea Meine Filialen</h2>
+          <p className="muted">Gespeicherte Filialen (bearbeiten in den <Link to="/settings">Einstellungen</Link>)</p>
           <div className="locations-grid">
             {MARKETS.map((market) => {
               const loc = locations[market];
@@ -280,16 +276,12 @@ export default function OffersPage({ session, theme }) {
                     ) : (
                       <p className="muted" style={{margin:0}}>Keine Filiale gespeichert</p>
                     )}
-                    <input type="text" placeholder="Filialname (f\u00fcr Schnellsuche)" style={{fontSize:"0.85rem"}}
+                    <input type="text" placeholder="Filialname" style={{fontSize:"0.85rem"}}
                       value={form.branchName ?? loc?.branchName ?? ""}
                       onChange={(e) => setLocationForms((prev) => ({...prev, [market]: {...prev[market], branchName: e.target.value}}))}
                     />
-                    <input type="text" placeholder="URL (optional)" style={{fontSize:"0.85rem"}}
-                      value={form.locationUrl ?? loc?.locationUrl ?? ""}
-                      onChange={(e) => setLocationForms((prev) => ({...prev, [market]: {...prev[market], locationUrl: e.target.value}}))}
-                    />
                     <button type="button" className="ghost" onClick={() => saveLocation(market)} style={{fontSize:"0.85rem"}}>
-                      {loc ? "Aktualisieren" : "Speichern"}
+                      {loc ? "Akt." : "Speichern"}
                     </button>
                   </div>
                 </div>
@@ -299,7 +291,7 @@ export default function OffersPage({ session, theme }) {
         </section>
 
         <section className="card">
-          <h2>💰 Preisvergleich</h2>
+          <h2>\ud83d\udcb0 Preisvergleich</h2>
           <div className="switch-row">
             {MARKETS.map((m) => (
               <button key={m} type="button" className={\	ab \\} onClick={() => toggleMarket(m)}>{m}</button>

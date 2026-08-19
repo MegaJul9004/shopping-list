@@ -1,6 +1,22 @@
-import { createContext, useContext, useEffect, useState } from "react";
+﻿import { createContext, useContext, useEffect, useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+
+const DEFAULT_THEME = {
+  primary: "#0d6e6e",
+  accent: "#ef8354",
+  bgTop: "#f9f3e7",
+  bgBottom: "#e2f3ff"
+};
+
+function loadTheme() {
+  try {
+    const raw = localStorage.getItem("shoppingTheme");
+    return raw ? { ...DEFAULT_THEME, ...JSON.parse(raw) } : DEFAULT_THEME;
+  } catch {
+    return DEFAULT_THEME;
+  }
+}
 
 const AppContext = createContext(null);
 
@@ -10,9 +26,9 @@ export function useApp() {
 
 export async function api(path, options = {}, token) {
   const extraHeaders = token
-    ? { Authorization: `Bearer ${token}` }
+    ? { Authorization: Bearer  }
     : {};
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(${API_BASE}, {
     headers: { "Content-Type": "application/json", ...extraHeaders },
     ...options
   });
@@ -34,6 +50,15 @@ export function AppProvider({ children }) {
   });
 
   const [settings, setSettings] = useState({ duplicateBehavior: "merge" });
+  const [theme, setTheme] = useState(loadTheme);
+
+  // Theme CSS-Variablen setzen
+  useEffect(() => {
+    document.documentElement.style.setProperty("--brand", theme.primary);
+    document.documentElement.style.setProperty("--accent", theme.accent);
+    document.documentElement.style.setProperty("--bg-top", theme.bgTop);
+    document.documentElement.style.setProperty("--bg-bottom", theme.bgBottom);
+  }, [theme]);
 
   useEffect(() => {
     if (session) {
@@ -45,7 +70,7 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     if (session) {
-      api(`/families/${session.familyId}/settings`, {}, session.token)
+      api(/families//settings, {}, session.token)
         .then((data) => {
           if (data.settings) setSettings(data.settings);
         })
@@ -57,7 +82,7 @@ export function AppProvider({ children }) {
     if (!session) return;
     try {
       const data = await api(
-        `/families/${session.familyId}/settings`,
+        /families//settings,
         {
           method: "POST",
           body: JSON.stringify(newSettings)
@@ -70,11 +95,25 @@ export function AppProvider({ children }) {
     }
   };
 
+  const updateTheme = (newTheme) => {
+    setTheme(newTheme);
+    localStorage.setItem("shoppingTheme", JSON.stringify(newTheme));
+  };
+
+  const resetTheme = () => {
+    setTheme({ ...DEFAULT_THEME });
+    localStorage.setItem("shoppingTheme", JSON.stringify(DEFAULT_THEME));
+  };
+
   const value = {
     session,
     setSession,
     settings,
     updateSettings,
+    theme,
+    updateTheme,
+    resetTheme,
+    DEFAULT_THEME,
     API_BASE
   };
 

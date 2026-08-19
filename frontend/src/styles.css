@@ -9,6 +9,21 @@
   --ok: #2a9d8f;
   --radius: 18px;
   --shadow: 0 14px 38px rgba(31, 42, 55, 0.14);
+.btn-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.85rem;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 12px;
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: background 160ms;
+}
+.btn-inline:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
 }
 
 * {
