@@ -178,17 +178,7 @@ export default function OffersPage() {
             </select></label>
             <button type="button" className="ghost" onClick={() => loadLiveOffers(true)}>Neu laden</button>
           </div>
-          <ul className="live-offers-list">
-            {liveOffers.map((offer, i) => (
-              <li key={i}>
-                <div><strong>{offer.market}</strong><p>{offer.title}</p></div>
-                <div className="offer-meta">
-                  <span>{Number.isFinite(offer.price) ? `${offer.price.toFixed(2)} €` : "Preis n/a"}</span>
-                  <a href={offer.url} target="_blank" rel="noreferrer">u00d6ffnen</a>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <div className="offer-grid">{liveOffers.map((offer, i) => (<div key={offer.url || i} className="offer-card">{offer.image ? <img src={offer.image} alt={offer.title} className="offer-card-img" /> : <div className="offer-card-img offer-card-img-placeholder"><span>📦</span></div>}<div className="offer-card-body"><span className="offer-market-badge">{offer.market}</span><h4 className="offer-card-title">{offer.title}</h4><div className="offer-card-price">{Number.isFinite(offer.price) ? `${offer.price.toFixed(2)} €` : "Preis n/a"}</div><a href={offer.url} target="_blank" rel="noreferrer" className="offer-card-link">Angebot öffnen →</a></div></div>}</div>
           {liveOffersHasMore && (
             <button type="button" onClick={() => loadLiveOffers(false)} disabled={loadingLiveOffers}>
               {loadingLiveOffers ? "Lädt..." : "Mehr Angebote laden"}
@@ -211,14 +201,7 @@ export default function OffersPage() {
           {offerSearchMeta && (
             <p className="muted" style={{margin:"0.5rem 0"}}>{offerSearchMeta.matches} Treffer in {offerSearchMeta.total} Angeboten</p>
           )}
-          <ul className="live-offers-list">
-            {offerSearchResults.map((offer, i) => (
-              <li key={i}>
-                <div><strong>{offer.market}</strong><p>{offer.title}</p></div>
-                <div className="offer-meta"><span>{Number.isFinite(offer.price) ? `${offer.price.toFixed(2)} €` : "n/a"}</span><a href={offer.url} target="_blank" rel="noreferrer">u00d6ffnen</a></div>
-              </li>
-            ))}
-          </ul>
+          {offerSearchResults.length > 0 && (<div className="offer-grid">{offerSearchResults.map((offer, i) => (<div key={offer.url || i} className="offer-card">{offer.image ? <img src={offer.image} alt={offer.title} className="offer-card-img" /> : <div className="offer-card-img offer-card-img-placeholder"><span>📦</span></div>}<div className="offer-card-body"><span className="offer-market-badge">{offer.market}</span><h4 className="offer-card-title">{offer.title}</h4><div className="offer-card-price">{Number.isFinite(offer.price) ? `${offer.price.toFixed(2)} €` : "Preis n/a"}</div><a href={offer.url} target="_blank" rel="noreferrer" className="offer-card-link">Angebot öffnen →</a></div></div>))}</div>
         </section>
 
         <section className="card">
@@ -244,14 +227,7 @@ export default function OffersPage() {
             </>
           )}
           {watchResults.length > 0 && (
-            <ul className="live-offers-list" style={{marginTop:"0.5rem"}}>
-              {watchResults.map((offer, i) => (
-                <li key={i}>
-                  <div><strong>{offer.market}</strong><p>{offer.title}</p><span className="muted">🔍 {offer.watchTerm}</span></div>
-                  <div className="offer-meta"><span>{Number.isFinite(offer.price) ? `${offer.price.toFixed(2)} €` : "n/a"}</span><a href={offer.url} target="_blank" rel="noreferrer">u00d6ffnen</a></div>
-                </li>
-              ))}
-            </ul>
+            <div className="offer-grid">{watchResults.map((offer, i) => (<div key={i} className="offer-card">{offer.image ? <img src={offer.image} alt={offer.title} className="offer-card-img" /> : <div className="offer-card-img offer-card-img-placeholder"><span>🔍</span></div>}<div className="offer-card-body"><span className="offer-market-badge">{offer.market}</span><h4 className="offer-card-title">{offer.title}</h4><p className="muted" style={{fontSize:"0.8rem",margin:0}}>🔍 {offer.watchTerm}</p><div className="offer-card-price">{Number.isFinite(offer.price) ? `${offer.price.toFixed(2)} €` : "n/a"}</div><a href={offer.url} target="_blank" rel="noreferrer" className="offer-card-link">öffnen →</a></div></div>))}</div>
           )}
         </section>
       </div>
