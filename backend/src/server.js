@@ -35,38 +35,20 @@ import {
   searchBranchesByZip
 } from "./db.js";
 import { buildExportByMarket, compareMarkets } from "./offers.js";
-import { getDefaultMarketSource, getLiveOffers, getMarketOffers, getSupportedMarkets } from "./liveOffers.js";
-import { searchChefkoch } from "./recipeSearch.js";
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: process.env.FRONTEND_ORIGIN || "http://localhost:5173",
-    methods: ["GET", "POST", "PATCH", "DELETE"]
-  }
+  cors: { origin: "*" }
 });
 
-const familyCode = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 6);
-const jwtSecret = process.env.JWT_SECRET || "dev-secret-change-me";
-
-app.use(
-  cors({
-    origin: process.env.FRONTEND_ORIGIN || "http://localhost:5173"
-  })
-);
+app.use(cors());
 app.use(express.json());
 
-io.on("connection", (socket) => {
-  socket.on("joinFamily", ({ token }) => {
-    try {
-      const payload = jwt.verify(String(token || ""), jwtSecret);
-      socket.join(payload.familyId);
-    } catch {
-      socket.emit("authError", "Invalid socket token");
-    }
-  });
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
 });
+
 
 function emitItems(familyId) {
   const items = getItemsByFamily(familyId);
@@ -710,5 +692,10 @@ const port = Number(process.env.PORT || 4000);
 server.listen(port, () => {
   // eslint-disable-next-line no-console
   console.log(`API listening on http://localhost:${port}`);
+
+const PORT = process.env.PORT || 4000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+>>>>>>> e51af1626bfc7b84fa0b1dab8162f4aaa1fb7247
 });
 
