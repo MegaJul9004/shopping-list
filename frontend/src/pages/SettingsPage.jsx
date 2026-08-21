@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useApp, api } from "../context/AppContext";
+import NavBar from "../components/NavBar";
 
 const THEME_PRESETS = [
   { name: "Standard", primary: "#0d6e6e", accent: "#ef8354", bgTop: "#f9f3e7", bgBottom: "#e2f3ff" },
@@ -11,21 +12,18 @@ const THEME_PRESETS = [
 
 const MARKETS = ["LIDL", "EDEKA", "ALDI", "REWE"];
 
-const EDEKA_BRANCHES = {
-  "80331": { name: "EDEKA München Zentrum", id: "801341", url: "https://www.edeka.de/maerkte/801341/angebote/" },
-  "10115": { name: "EDEKA Berlin Mitte", id: "700101", url: "https://www.edeka.de/maerkte/700101/angebote/" },
-  "20095": { name: "EDEKA Hamburg Zentrum", id: "700200", url: "https://www.edeka.de/maerkte/700200/angebote/" },
-  "50667": { name: "EDEKA Köln Zentrum", id: "700506", url: "https://www.edeka.de/maerkte/700506/angebote/" },
-  "60311": { name: "EDEKA Frankfurt Zentrum", id: "700603", url: "https://www.edeka.de/maerkte/700603/angebote/" }
-};
-
 export default function SettingsPage() {
   const { session, settings, updateSettings, theme, updateTheme, resetTheme } = useApp();
   const [showTheme, setShowTheme] = useState(false);
   const [saving, setSaving] = useState(false);
   const [branches, setBranches] = useState({});
-  const [branchForms, setBranchForms] = useState({});
   const [branchMessage, setBranchMessage] = useState("");
+
+  // PLZ / Address search
+  const [zipInput, setZipInput] = useState("");
+  const [zipResults, setZipResults] = useState([]);
+  const [zipSearching, setZipSearching] = useState(false);
+  const [zipSaving, setZipSaving] = useState(false);
 
   const loadBranches = useCallback(async () => {
     if (!session) return;
@@ -37,28 +35,73 @@ export default function SettingsPage() {
 
   useEffect(() => { loadBranches(); }, [loadBranches]);
 
+  // Debounced ZIP search
+  useEffect(() => {
+    const clean = zipInput.replace(/[^0-9]/g, "");
+    if (clean.length < 3) {
+      setZipResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setZipSearching(true);
+      try {
+        const data = await api(`/branches/search?zip=${clean}`);
+        setZipResults(Array.isArray(data.branches) ? data.branches : []);
+      } catch (e) {
+        setZipResults([]);
+      }
+      setZipSearching(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [zipInput]);
+
   const handleDuplicateChange = async (behavior) => {
     setSaving(true);
     await updateSettings({ duplicateBehavior: behavior });
-    try { await api(`/families/${session.familyId}/settings`, { method: "POST", body: JSON.stringify({ duplicateBehavior: behavior }) }, session.token); } catch (e) { console.error(e); }
+    try {
+      await api(`/families/${session.familyId}/settings`, {
+        method: "POST",
+        body: JSON.stringify({ duplicateBehavior: behavior })
+      }, session.token);
+    } catch (e) { console.error(e); }
     setSaving(false);
   };
 
-  const saveBranch = async (market) => {
-    const form = branchForms[market] || {};
-    if (!form.branchName && !form.branchZip) {
-      setBranchMessage(`Bitte mindestens Filialnamen oder PLZ für ${market} eingeben.`);
-      return;
-    }
+  const applyBranchResults = async () => {
+    if (zipResults.length === 0) return;
+    setZipSaving(true);
     setBranchMessage("");
-    try {
-      const data = await api(`/families/${session.familyId}/branches/${market}`,
-        { method: "POST", body: JSON.stringify(form) }, session.token);
-      if (data.branch) {
-        setBranches((prev) => ({ ...prev, [market]: data.branch }));
-        setBranchMessage(`${market}: Gespeichert ✓`);
+    let saved = 0;
+    let errors = 0;
+
+    for (const entry of zipResults) {
+      if (!entry.market || !entry.name) continue;
+      try {
+        const data = await api(`/families/${session.familyId}/branches/${entry.market}`,
+          { method: "POST", body: JSON.stringify({
+            branchName: entry.name,
+            branchCity: entry.city || "",
+            branchZip: entry.zip || "",
+            branchId: entry.id || "",
+            locationUrl: entry.url || ""
+          }) }, session.token);
+        if (data.branch) {
+          setBranches((prev) => ({ ...prev, [entry.market]: data.branch }));
+          saved++;
+        }
+      } catch {
+        errors++;
       }
-    } catch (e) { setBranchMessage(`Fehler: ${e.message}`); }
+    }
+
+    if (errors > 0) {
+      setBranchMessage(`${saved} gespeichert, ${errors} Fehler`);
+    } else {
+      setBranchMessage(`✓ Alle ${saved} Filialen gespeichert`);
+    }
+    setZipSaving(false);
+    setZipResults([]);
+    setZipInput("");
   };
 
   const removeBranch = async (market) => {
@@ -69,159 +112,142 @@ export default function SettingsPage() {
     } catch (e) { setBranchMessage(`Fehler: ${e.message}`); }
   };
 
-  const handleBranchZipLookup = (market, zip) => {
-    const match = EDEKA_BRANCHES[zip];
-    if (match && market === "EDEKA") {
-      setBranchForms((prev) => ({
-        ...prev, [market]: {
-          ...prev[market],
-          branchName: match.name, branchId: match.id,
-          locationUrl: match.url, branchZip: zip,
-          branchCity: match.name.replace("EDEKA ", "")
-        }
-      }));
-    }
-  };
-
-  if (!session) {
-    return (
-      <div className="page-shell">
-        <div className="hero">
-          <p className="eyebrow">Einstellungen</p>
-          <h1>Anmeldung erforderlich</h1>
-          <p>Bitte melde dich an, um die Einstellungen zu verwalten.</p>
-          <Link to="/" className="btn-inline">Zurück zur Startseite</Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="page-shell">
-      <div className="hero">
-        <p className="eyebrow">Einstellungen</p>
-        <h1>Anpassungen</h1>
-        <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.6rem" }}>
-          <Link to="/" className="btn-inline">← Zurück</Link>
-          <Link to="/offers" className="btn-inline">🛒 Angebote</Link>
-        </div>
+      <NavBar theme={theme} session={session} onLogout={() => {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("shopping_session");
+          window.location.reload();
+        }
+      }} />
+      <div className="hero" style={{ background: `linear-gradient(135deg, ${theme.primary}, ${theme.accent})` }}>
+        <h1>⚙️ Einstellungen</h1>
+        <p>Farbschema, Duplikat-Verhalten und Filialen verwalten</p>
       </div>
 
       <div className="dashboard-grid" style={{ marginTop: "1.4rem" }}>
         <section className="card">
           <h2>🎨 Farbschema</h2>
-          <div className="theme-presets">
-            {THEME_PRESETS.map((preset) => (
-              <button key={preset.name} type="button" className="ghost"
-                onClick={() => updateTheme(preset)}
-                style={{ borderLeft: `4px solid ${preset.primary}`, background: preset.bgTop, color: "#1f2a37" }}
-              >{preset.name}</button>
-            ))}
-          </div>
-          <button type="button" className="ghost" onClick={() => setShowTheme(!showTheme)} style={{ marginTop: "0.5rem" }}>
-            {showTheme ? "Fertige Farben ausblenden" : "Farben individuell anpassen"}
+          <button type="button" className="ghost" onClick={() => setShowTheme(!showTheme)}>
+            {showTheme ? "Schließen" : "Anpassen"}
           </button>
           {showTheme && (
-            <div className="theme-grid" style={{ marginTop: "0.5rem" }}>
-              <label>Primärfarbe <input type="color" value={theme.primary} onChange={(e) => updateTheme({...theme, primary: e.target.value})} /></label>
-              <label>Akzentfarbe <input type="color" value={theme.accent} onChange={(e) => updateTheme({...theme, accent: e.target.value})} /></label>
-              <label>Hintergrund oben <input type="color" value={theme.bgTop} onChange={(e) => updateTheme({...theme, bgTop: e.target.value})} /></label>
-              <label>Hintergrund unten <input type="color" value={theme.bgBottom} onChange={(e) => updateTheme({...theme, bgBottom: e.target.value})} /></label>
+            <div className="theme-picker">
+              <div className="theme-presets">
+                {THEME_PRESETS.map((preset) => (
+                  <button key={preset.name} type="button" className="ghost"
+                    onClick={() => updateTheme(preset)}
+                    style={{
+                      borderLeft: `6px solid ${preset.primary}`,
+                      textAlign: "left", fontSize: "0.9rem"
+                    }}
+                  >
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+              <div className="theme-grid">
+                <label>Primär <input type="color" value={theme.primary}
+                  onChange={(e) => updateTheme({ primary: e.target.value })} /></label>
+                <label>Akzent <input type="color" value={theme.accent}
+                  onChange={(e) => updateTheme({ accent: e.target.value })} /></label>
+                <label>Hintergrund oben <input type="color" value={theme.bgTop}
+                  onChange={(e) => updateTheme({ bgTop: e.target.value })} /></label>
+                <label>Hintergrund unten <input type="color" value={theme.bgBottom}
+                  onChange={(e) => updateTheme({ bgBottom: e.target.value })} /></label>
+              </div>
+              <button type="button" className="ghost" onClick={resetTheme}>Zurücksetzen</button>
             </div>
           )}
-          <button className="ghost" onClick={resetTheme} style={{ marginTop: "0.5rem" }}>Zurücksetzen</button>
         </section>
 
         <section className="card">
-          <h2>⚙️ Einkaufsliste</h2>
-          <label>
-            <strong>Verhalten bei doppelten Artikeln</strong>
+          <h2>🧠 Smart-Liste</h2>
+          <label>Duplikat-Verhalten
             <select value={settings.duplicateBehavior} onChange={(e) => handleDuplicateChange(e.target.value)} disabled={saving}>
-              <option value="merge">Menge erhöhen (z. B. "Eier 2x")</option>
-              <option value="separate">Separate Einträge anlegen</option>
+              <option value="merge">Mengen zusammenführen</option>
+              <option value="separate">Separate Einträge</option>
             </select>
-            <p className="muted" style={{ marginTop: "0.3rem" }}>
-              Wenn "Eier" zweimal eingegeben wird, wird bei "Menge erhöhen" die Stückzahl automatisch erhöht.
-            </p>
           </label>
+          {saving && <p className="muted">Speichere...</p>}
         </section>
 
-        <section className="card">
-          <h2>ℹ️ Über die App</h2>
-          <p className="muted">
-            Family Shopping List – Version 2.0<br />
-            Backend: {import.meta.env.VITE_API_URL || "http://localhost:4000/api"}<br />
-            Familie: {session?.familyName || "—"} (Code: {session?.familyId || "—"})
-          </p>
-        </section>
-      </div>
-
-      <div className="dashboard-grid" style={{ marginTop: "1rem" }}>
         <section className="card" style={{ gridColumn: "1 / -1" }}>
-          <h2>🏪 Filialen / Standorte</h2>
-          <p className="muted">Gib deine Stamm-Filialen ein – per PLZ, Ort oder direkter Filial-ID.</p>
-          {branchMessage && <p className="muted" style={{ color: branchMessage.includes("✓") ? "var(--ok)" : "var(--danger)", marginBottom: "0.5rem" }}>{branchMessage}</p>}
-          <div className="branches-grid">
+          <h2>🏪 Filialen (LIDL, EDEKA, ALDI, REWE)</h2>
+          <p className="muted">Gib eine Postleitzahl ein, um alle Filialen in der Nähe zu finden und zu speichern.</p>
+
+          {/* PLZ Search */}
+          <div className="zip-search-row">
+            <input type="text" placeholder="PLZ eingeben (z. B. 31303 für Burgdorf)"
+              value={zipInput}
+              onChange={(e) => {
+                const v = e.target.value.replace(/[^0-9]/g, "").slice(0, 5);
+                setZipInput(v);
+              }}
+              onKeyDown={(e) => { if (e.key === "Enter" && zipResults.length > 0) applyBranchResults(); }}
+              style={{ maxWidth: "300px", display: "inline-block" }}
+            />
+            {zipSearching && <span className="muted" style={{ marginLeft: "0.5rem" }}>Suche...</span>}
+            {zipResults.length > 0 && !zipSearching && (
+              <>
+                <span className="muted" style={{ marginLeft: "0.5rem", color: "var(--ok)" }}>
+                  {zipResults.length} Filialen gefunden
+                </span>
+                <button type="button" onClick={applyBranchResults} disabled={zipSaving}
+                  style={{ marginLeft: "0.5rem" }}>
+                  {zipSaving ? "Speichere..." : "Alle übernehmen"}
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Search Results Preview */}
+          {zipResults.length > 0 && (
+            <div className="zip-results-list">
+              {MARKETS.map((m) => {
+                const marketResults = zipResults.filter((r) => r.market === m);
+                if (marketResults.length === 0) return null;
+                return (
+                  <div key={m} className="zip-result-item">
+                    <strong className="zip-result-market">{m}</strong>
+                    {marketResults.map((r, i) => (
+                      <span key={i} className="zip-result-name">{r.name}{r.city ? ` (${r.city})` : ""}</span>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {branchMessage && <p className="muted" style={{ marginTop: "0.5rem", color: branchMessage.includes("Fehler") ? "var(--danger)" : "var(--ok)" }}>{branchMessage}</p>}
+
+          {/* Saved Branches */}
+          <div className="branches-grid" style={{ marginTop: "1rem" }}>
             {MARKETS.map((market) => {
               const branch = branches[market];
-              const form = branchForms[market] || {};
               return (
-                <div className="branch-card" key={market} style={{ borderLeft: "4px solid var(--primary, #0d6e6e)" }}>
+                <div className="branch-card" key={market} style={{ borderLeft: `4px solid var(--primary, ${theme.primary})` }}>
                   <h3>{market}</h3>
-                  {branch && (
+                  {branch ? (
                     <div className="branch-saved">
                       <p><strong>{branch.branchName}</strong></p>
                       {branch.branchZip && <span className="muted">PLZ: {branch.branchZip}</span>}
                       {branch.branchCity && <span className="muted"> · {branch.branchCity}</span>}
                       {branch.branchId && <span className="muted"> · ID: {branch.branchId}</span>}
                       {branch.locationUrl && <p><a href={branch.locationUrl} target="_blank" rel="noreferrer">Zur Filial-Website →</a></p>}
-                      <button type="button" className="danger" style={{ fontSize: "0.8rem", padding: "0.25rem 0.5rem" }} onClick={() => removeBranch(market)}>Entfernen</button>
+                      <button type="button" className="danger" style={{ fontSize: "0.8rem", padding: "0.25rem 0.5rem", marginTop: "0.3rem" }} onClick={() => removeBranch(market)}>Entfernen</button>
                     </div>
+                  ) : (
+                    <p className="muted">Keine Filiale gespeichert</p>
                   )}
-                  <div className="branch-form">
-                    <label>PLZ (für EDEKA-Vorschläge)
-                      <input type="text" placeholder="z. B. 80331"
-                        value={form.branchZip ?? branch?.branchZip ?? ""}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setBranchForms((prev) => ({...prev, [market]: {...prev[market], branchZip: v}}));
-                          if (v.length === 5) handleBranchZipLookup(market, v);
-                        }}
-                      />
-                    </label>
-                    <label>Filialname
-                      <input type="text" placeholder="z. B. EDEKA Hauptstraße"
-                        value={form.branchName ?? branch?.branchName ?? ""}
-                        onChange={(e) => setBranchForms((prev) => ({...prev, [market]: {...prev[market], branchName: e.target.value}}))}
-                      />
-                    </label>
-                    <label>Ort
-                      <input type="text" placeholder="z. B. München"
-                        value={form.branchCity ?? branch?.branchCity ?? ""}
-                        onChange={(e) => setBranchForms((prev) => ({...prev, [market]: {...prev[market], branchCity: e.target.value}}))}
-                      />
-                    </label>
-                    <label>Filial-ID
-                      <input type="text" placeholder="z. B. 801341"
-                        value={form.branchId ?? branch?.branchId ?? ""}
-                        onChange={(e) => setBranchForms((prev) => ({...prev, [market]: {...prev[market], branchId: e.target.value}}))}
-                      />
-                    </label>
-                    <label>Angebots-URL
-                      <input type="text" placeholder="https://www.edeka.de/maerkte/..."
-                        value={form.locationUrl ?? branch?.locationUrl ?? ""}
-                        onChange={(e) => setBranchForms((prev) => ({...prev, [market]: {...prev[market], locationUrl: e.target.value}}))}
-                      />
-                    </label>
-                    <button type="button" className="ghost" onClick={() => saveBranch(market)} style={{ marginTop: "0.3rem" }}>
-                      {branch ? "Aktualisieren" : "Speichern"}
-                    </button>
-                  </div>
                 </div>
               );
             })}
           </div>
         </section>
+      </div>
+      <div style={{ display: "flex", justifyContent: "center", marginTop: "1rem" }}>
+        <Link to="/" className="btn-inline">← Zurück zum Dashboard</Link>
       </div>
     </div>
   );

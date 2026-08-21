@@ -695,3 +695,42 @@ h3 {
     height: 100px;
   }
 }
+
+/* -- ZIP Search Branch ----------------------------------------------- */
+.zip-search-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.zip-results-list {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+  padding: 0.8rem;
+  background: #f0f7fb;
+  border-radius: 12px;
+  border: 1px solid #d2e6f6;
+}
+
+.zip-result-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid #e0ecf4;
+}
+.zip-result-item:last-child { border-bottom: none; }
+
+.zip-result-market {
+  font-family: "Sora", sans-serif;
+  font-size: 0.8rem;
+  color: var(--brand);
+  min-width: 60px;
+}
+
+.zip-result-name {
+  font-size: 0.9rem;
+  color: var(--ink);
+}
