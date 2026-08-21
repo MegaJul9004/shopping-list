@@ -85,7 +85,7 @@ export function AppProvider({ children }) {
   };
 
   return (
-    <AppContext.Provider value={{ session, setSession, settings, updateSettings, theme, updateTheme, resetTheme, setSession }}>
+    <AppContext.Provider value={{ session, setSession, settings, updateSettings, theme, updateTheme, resetTheme }}>
       {children}
     </AppContext.Provider>
   );
