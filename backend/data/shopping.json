@@ -34,37 +34,44 @@
       "createdAt": "2026-08-19T16:35:47.849Z"
     }
   ],
-  "shoppingItems": [],
+  "shoppingItems": [
+    {
+      "id": "vYGL-AHY9R",
+      "familyId": "UKTX4Y",
+      "name": "Eier",
+      "quantity": 1,
+      "checked": false,
+      "createdAt": "2026-08-19T18:48:32.273Z"
+    },
+    {
+      "id": "adNeYC8MUQ",
+      "familyId": "UKTX4Y",
+      "name": "Hackfleisch",
+      "quantity": 1,
+      "checked": false,
+      "createdAt": "2026-08-19T18:58:35.970Z"
+    }
+  ],
   "recurringItems": [],
   "familyLocations": [
     {
       "familyId": "UKTX4Y",
-      "market": "LIDL",
+      "market": "EDEKA",
       "branchName": "EDEKA Center Cramer",
-      "branchCity": "Burgdorf",
-      "branchZip": "31303",
-      "branchId": "801341",
-      "locationUrl": "https://www.edeka.de/maerkte/801341/"
+      "branchCity": "",
+      "branchZip": "",
+      "branchId": "",
+      "locationUrl": "https://www.edeka.de/maerkte/801341/angebote/"
     }
   ],
   "familySettings": [],
-  "miniLists": [
+  "miniLists": [],
+  "offerWatchlist": [
     {
-      "id": "6v3M5j9qs5",
+      "id": "EVDI-Wyoci",
       "familyId": "UKTX4Y",
-      "name": "Wrap Pizza",
-      "items": [
-        {
-          "name": "Tomaten",
-          "quantity": 1
-        },
-        {
-          "name": "Wraps",
-          "quantity": 1
-        }
-      ],
-      "createdAt": "2026-08-19T16:38:00.623Z"
+      "searchTerm": "Milka",
+      "createdAt": "2026-08-19T19:02:49.522Z"
     }
-  ],
-  "offerWatchlist": []
+  ]
 }
