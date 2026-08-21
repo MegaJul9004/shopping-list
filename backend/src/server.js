@@ -28,10 +28,11 @@ import {
   getItemsByFamily,
   getRecurringItemsByFamily,
   removeFromOfferWatchlist,
-  saveFamilyBranchLocation
+  saveFamilyBranchLocation,
   setFamilySettings,
   smartAddItem,
-  updateItem
+  updateItem,
+  searchBranchesByZip
 } from "./db.js";
 import { buildExportByMarket, compareMarkets } from "./offers.js";
 import { getDefaultMarketSource, getLiveOffers, getMarketOffers, getSupportedMarkets } from "./liveOffers.js";
@@ -71,6 +72,17 @@ function emitItems(familyId) {
   const items = getItemsByFamily(familyId);
   io.to(familyId).emit("itemsSnapshot", items);
 }
+
+app.get("/api/branches/search", (req, res) => {
+  const zip = String(req.query.zip || "").trim();
+  if (!zip) return res.json({ branches: [] });
+  try {
+    const results = searchBranchesByZip(zip);
+    return res.json({ branches: results, query: zip });
+  } catch(e) {
+    return res.json({ branches: [], error: e.message });
+  }
+});
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
@@ -324,7 +336,7 @@ app.delete("/api/families/:familyId/items/:itemId", authMiddleware, (req, res) =
   return res.json({ ok: true });
 });
 
-// ── Wiederkehrende Artikel ───────────────────────────────────────────
+// â”€â”€ Wiederkehrende Artikel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/api/families/:familyId/recurring", authMiddleware, (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
 
@@ -380,7 +392,7 @@ app.delete(
   }
 );
 
-// ── Markt-Standorte / Filialen ──────────────────────────────────────
+// â”€â”€ Markt-Standorte / Filialen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/api/families/:familyId/locations", authMiddleware, (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
 
@@ -429,7 +441,7 @@ app.delete("/api/families/:familyId/branches/:market", authMiddleware, (req, res
   return res.json({ ok: true });
 });
 
-// ── Legacy: einfache Standorte (Weiterleitung an Branches) ─────────
+// â”€â”€ Legacy: einfache Standorte (Weiterleitung an Branches) â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/api/families/:familyId/locations", authMiddleware, (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
   const market = String(req.body?.market || "").trim().toUpperCase();
@@ -455,7 +467,7 @@ app.get("/api/offers/locations", (_req, res) => {
   return res.json({ locations });
 });
 
-// ── Family Settings ─────────────────────────────────────────────────
+// â”€â”€ Family Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/api/families/:familyId/settings", authMiddleware, (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
   if (req.auth.familyId !== familyId) {
@@ -476,7 +488,7 @@ app.post("/api/families/:familyId/settings", authMiddleware, (req, res) => {
   return res.json({ settings: updated });
 });
 
-// ── Mini-Lists / Recipes ───────────────────────────────────────────
+// â”€â”€ Mini-Lists / Recipes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/api/families/:familyId/mini-lists", authMiddleware, (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
   if (req.auth.familyId !== familyId) {
@@ -512,7 +524,7 @@ app.delete("/api/families/:familyId/mini-lists/:listId", authMiddleware, (req, r
   return res.json({ ok: true });
 });
 
-// ── Offer Watchlist ─────────────────────────────────────────────────
+// â”€â”€ Offer Watchlist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/api/families/:familyId/offer-watchlist", authMiddleware, (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
   if (req.auth.familyId !== familyId) {
@@ -547,7 +559,7 @@ app.delete("/api/families/:familyId/offer-watchlist/:watchId", authMiddleware, (
   return res.json({ ok: true });
 });
 
-// ── Recipe Search ──────────────────────────────────────────────────
+// â”€â”€ Recipe Search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/api/recipes/search", async (req, res) => {
   const query = String(req.query.q || "").trim();
   if (!query) {
@@ -699,3 +711,4 @@ server.listen(port, () => {
   // eslint-disable-next-line no-console
   console.log(`API listening on http://localhost:${port}`);
 });
+

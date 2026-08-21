@@ -30,7 +30,7 @@ function normalizeWhitespace(text) {
 }
 
 function extractEuroPrice(text) {
-  const match = String(text || "").match(/(\d{1,3}(?:[.,]\d{1,2})?)\s*€/);
+  const match = String(text || "").match(/(\d{1,3}(?:[.,]\d{1,2})?)\s*â‚¬/);
   if (!match) {
     return null;
   }
@@ -111,7 +111,7 @@ function parseAldiOffers(html) {
     }
 
     const text = normalizeWhitespace($(element).text());
-    if (!text || !text.includes("€")) {
+    if (!text || !text.includes("â‚¬")) {
       return;
     }
 
@@ -135,6 +135,19 @@ function parseAldiOffers(html) {
 }
 
 function parseGenericOffers(html, market, pageUrl) {
+      function extractImgFrom(el, $) {
+    var img = $(el).find("img[src]").first() || $(el).find("img[data-src]").first();
+    var src = img.attr("src") || $(el).find("img[data-src]").first().attr("data-src") || "";
+    if (!src) {
+      var parentImg = $(el).closest("article, div, li, section").find("img[src]").first();
+      src = parentImg.attr("src") || "";
+    }
+    if (!src) return null;
+    return src.startsWith("http") ? src : (src.startsWith("//") ? "https:" + src : null);
+  }
+    if (!src) return null;
+    return src.startsWith('http') ? src : (src.startsWith('//') ? 'https:' + src : null);
+  }
   const $ = cheerio.load(html);
   const offers = [];
   const seen = new Set();
@@ -159,7 +172,7 @@ function parseGenericOffers(html, market, pageUrl) {
     }
 
     const title = normalizeWhitespace($(element).text());
-    if (!title || title.length < 8 || title.length > 240 || !title.includes("€")) {
+    if (!title || title.length < 8 || title.length > 240 || !title.includes("â‚¬")) {
       return;
     }
 
@@ -178,6 +191,7 @@ function parseGenericOffers(html, market, pageUrl) {
       url: href,
       market,
       source,
+      image: extractImgFrom(element, $),
       fetchedAt: new Date().toISOString()
     });
   });
@@ -282,3 +296,5 @@ export async function getLiveOffers(options = {}) {
     offers: paged
   };
 }
+
+

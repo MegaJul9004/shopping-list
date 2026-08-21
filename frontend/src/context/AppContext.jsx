@@ -63,6 +63,15 @@ export function AppProvider({ children }) {
     localStorage.setItem("shopping_theme", JSON.stringify(theme));
   }, [theme]);
 
+  // Apply theme as CSS custom properties
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--bg-top', theme.bgTop);
+    root.style.setProperty('--bg-bottom', theme.bgBottom);
+    root.style.setProperty('--brand', theme.primary);
+    root.style.setProperty('--accent', theme.accent);
+  }, [theme]);
+
   const updateSettings = async (newSettings) => {
     setSettings((prev) => ({ ...prev, ...newSettings }));
   };
@@ -76,7 +85,7 @@ export function AppProvider({ children }) {
   };
 
   return (
-    <AppContext.Provider value={{ session, setSession, settings, updateSettings, theme, updateTheme, resetTheme }}>
+    <AppContext.Provider value={{ session, setSession, settings, updateSettings, theme, updateTheme, resetTheme, setSession }}>
       {children}
     </AppContext.Provider>
   );

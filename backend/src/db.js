@@ -380,3 +380,7 @@ export function removeFromOfferWatchlist({ watchId, familyId }) {
   if (changed) persist();
   return changed;
 }
+
+// -- Branch search -------------------------------------
+import { searchBranchesByZip as _searchBranchesByZip } from "./branchData.js";
+export { _searchBranchesByZip as searchBranchesByZip };
