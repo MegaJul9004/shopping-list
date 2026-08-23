@@ -688,14 +688,7 @@ app.get("/api/offers/export", authMiddleware, async (req, res) => {
   });
 });
 
-const port = Number(process.env.PORT || 4000);
-server.listen(port, () => {
-  // eslint-disable-next-line no-console
-  console.log(`API listening on http://localhost:${port}`);
-
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
->>>>>>> e51af1626bfc7b84fa0b1dab8162f4aaa1fb7247
 });
-
