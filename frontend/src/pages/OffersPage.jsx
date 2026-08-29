@@ -42,36 +42,52 @@ export default function OffersPage() {
   const [offerSearchResults, setOfferSearchResults] = useState([]);
   const [offerSearchMeta, setOfferSearchMeta] = useState(null);
   const [offerSearching, setOfferSearching] = useState(false);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [weekInfo, setWeekInfo] = useState({ current: null, next: null });
+  const [unavailableMarkets, setUnavailableMarkets] = useState(null);
+  const [currentWeekRange, setCurrentWeekRange] = useState(null);
+
+  async function loadWeekInfo() {
+    try {
+      const data = await api("/offers/week-info");
+      setWeekInfo(data);
+    } catch (e) { console.error(e); }
+  }
 
   async function loadLiveOffers(refresh) {
     setLoadingLiveOffers(true);
+    setUnavailableMarkets(null);
     try {
       const offset = refresh ? 0 : liveOffersOffset;
       const refreshParam = refresh ? "&refresh=1" : "";
-      const data = await api(`/offers/live?market=${liveMarketView}&offset=${offset}&limit=20${refreshParam}`);
+      const data = await api(`/offers/live?market=${liveMarketView}&offset=${offset}&limit=20${refreshParam}&week=${weekOffset}`);
       if (refresh) setLiveOffers(data.offers);
       else setLiveOffers((prev) => [...prev, ...data.offers]);
       setLiveOffersHasMore(data.hasMore);
       setLiveOffersOffset(offset + data.offers.length);
+      setUnavailableMarkets(data.unavailableMarkets || null);
+      if (data.week) setCurrentWeekRange(data.week);
     } catch (e) { console.error(e); }
     setLoadingLiveOffers(false);
   }
+
+  useEffect(() => { loadWeekInfo(); }, []);
 
   useEffect(() => {
     setLiveOffers([]);
     setLiveOffersOffset(0);
     loadLiveOffers(true);
-  }, [liveMarketView]);
+  }, [liveMarketView, weekOffset]);
 
   const loadComparison = useCallback(async () => {
     if (!session) return;
     setLoadingOffers(true);
     try {
-      const data = await api(`/offers/compare?markets=${selectedMarkets.join(",")}`, {}, session.token);
+      const data = await api(`/offers/compare?markets=${selectedMarkets.join(",")}&week=${weekOffset}`, {}, session.token);
       setOffersResult(data);
     } catch (e) { console.error(e); }
     setLoadingOffers(false);
-  }, [session, selectedMarkets]);
+  }, [session, selectedMarkets, weekOffset]);
 
   const toggleMarket = (m) => {
     setSelectedMarkets((prev) => prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]);
@@ -133,7 +149,7 @@ export default function OffersPage() {
     setWatchLoading(true);
     setWatchResults([]);
     try {
-      const data = await api("/offers/live?market=ALL&offset=0&limit=200&refresh=1");
+      const data = await api(`/offers/live?market=ALL&offset=0&limit=200&refresh=1&week=${weekOffset}`);
       const allOffers = data.offers || [];
       const results = [];
       for (const watch of watchlist) {
@@ -152,7 +168,7 @@ export default function OffersPage() {
     setOfferSearchResults([]);
     setOfferSearchMeta(null);
     try {
-      const data = await api("/offers/live?market=ALL&offset=0&limit=200&refresh=1");
+      const data = await api(`/offers/live?market=ALL&offset=0&limit=200&refresh=1&week=${weekOffset}`);
       const allOffers = data.offers || [];
       const term = offerSearch.toLowerCase();
       const matches = allOffers.filter((o) => o.title && o.title.toLowerCase().includes(term));
@@ -165,35 +181,62 @@ export default function OffersPage() {
   const exportCsv = async () => {
     if (!session) return;
     try {
-      const data = await api(`/offers/export?markets=${selectedMarkets.join(",")}&format=csv`, {}, session.token);
+      const data = await api(`/offers/export?markets=${selectedMarkets.join(",")}&format=csv&week=${weekOffset}`, {}, session.token);
       const blob = new Blob([data.csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "einkauf-nach-markt.csv";
+      a.download = `einkauf-nach-markt-woche${weekOffset}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) { console.error(e); }
   };
+
+  const weekLabel = currentWeekRange
+    ? `${currentWeekRange.label} (${currentWeekRange.startDE} – ${currentWeekRange.endDE})`
+    : (weekOffset === 0 ? "Diese Woche" : "Nächste Woche");
+
   return (
     <div className="page-shell">
       <div className="hero">
-        <p className="eyebrow">Angebote</p>
+        <p className="eyebrow">Angebote · {weekLabel}</p>
         <h1>Markt-Angebote durchsuchen & vergleichen</h1>
+        <div className="switch-row" style={{marginTop:"0.8rem"}}>
+          <button type="button" className={weekOffset === 0 ? "tab active" : "tab"} onClick={() => setWeekOffset(0)}>
+            📅 Diese Woche{weekInfo.current ? ` · ${weekInfo.current.startDE}–${weekInfo.current.endDE}` : ""}
+          </button>
+          <button type="button" className={weekOffset === 1 ? "tab active" : "tab"} onClick={() => setWeekOffset(1)}>
+            ➡️ Nächste Woche{weekInfo.next ? ` · ${weekInfo.next.startDE}–${weekInfo.next.endDE}` : ""}
+            {weekInfo.next && !weekInfo.next.available && <span style={{marginLeft:"0.4rem",fontSize:"0.7rem"}}>⏳</span>}
+          </button>
+        </div>
         <div style={{display:"flex",gap:"0.5rem",marginTop:"0.6rem"}}>
-          <Link to="/" className="btn-inline">← Zurück</Link>
+          <Link to="/" className="btn-inline">← Zurück zur Startseite</Link>
           <Link to="/settings" className="btn-inline">⚙ Einstellungen</Link>
         </div>
       </div>
 
       <div className="dashboard-grid wide" style={{marginTop:"1.4rem"}}>
         <section className="card">
-          <h2>📰 Live-Angebote</h2>
+          <h2>📰 Live-Angebote · {weekLabel}</h2>
+          {unavailableMarkets && unavailableMarkets.length > 0 && (
+            <div className="error-banner" style={{margin:"0.6rem 0",padding:"0.5rem 0.7rem"}}>
+              {unavailableMarkets.map((u, i) => (
+                <div key={i}><strong>{u.market}:</strong> {u.reason}</div>
+              ))}
+            </div>
+          )}
           <div className="live-controls">
             <label>Ansicht<select value={liveMarketView} onChange={(e) => { setLiveMarketView(e.target.value); setLiveOffersOffset(0); }}>
               <option value="ALL">Alle Märkte</option>
               {MARKETS.map((m) => <option key={m} value={m}>{m}</option>)}
             </select></label>
+<button type="button" className="ghost" onClick={() => loadLiveOffers(true)}>Neu laden</button>
+{unavailableMarkets && (
+  <p className="muted" style={{ fontSize: "0.8rem", margin: "0.5rem 0" }}>
+    {unavailableMarkets.map(u => `${u.market}: ${u.reason}`).join(" · ")}
+  </p>
+)}
             <button type="button" className="ghost" onClick={() => loadLiveOffers(true)}>Neu laden</button>
           </div>
           <div className="offer-grid">{liveOffers.map((offer, i) => <OfferCard key={offer.url || i} offer={offer} />)}</div>
@@ -206,7 +249,7 @@ export default function OffersPage() {
 
         <section className="card">
           <h2>🔍 Angebotssuche</h2>
-          <p className="muted">Durchsuche alle aktuellen Angebote nach Stichwort</p>
+          <p className="muted">Durchsuche alle Angebote von {weekLabel} nach Stichwort</p>
           <div className="add-form" style={{gridTemplateColumns:"1fr auto"}}>
             <input type="text" placeholder="z. B. Hähnchen, Milch..." value={offerSearch}
               onChange={(e) => setOfferSearch(e.target.value)}
@@ -223,7 +266,7 @@ export default function OffersPage() {
 
         <section className="card">
           <h2>👀 Angebots-Watchlist</h2>
-          <p className="muted">Suchbegriffe festlegen und auf Angebote lauschen</p>
+          <p className="muted">Suchbegriffe festlegen und auf Angebote aus {weekLabel} lauschen</p>
           <div className="add-form" style={{gridTemplateColumns:"1fr auto"}}>
             <input type="text" placeholder="z. B. Hähnchen" value={watchSearch}
               onChange={(e) => setWatchSearch(e.target.value)}
@@ -282,7 +325,7 @@ export default function OffersPage() {
         </section>
 
         <section className="card">
-          <h2>💰 Preisvergleich</h2>
+          <h2>💰 Preisvergleich · {weekLabel}</h2>
           <div className="switch-row">
             {MARKETS.map((m) => (
               <button key={m} type="button" className={selectedMarkets.includes(m) ? "tab active" : "tab"} onClick={() => toggleMarket(m)}>{m}</button>
@@ -310,5 +353,3 @@ export default function OffersPage() {
     </div>
   );
 }
-
-
