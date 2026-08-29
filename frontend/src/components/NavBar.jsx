@@ -1,46 +1,5 @@
-import { useApp } from "../context/AppContext";
-export default function NavBar({ theme, onThemeToggle, session, onLogout }) {
-  const { editorMode, setEditorMode } = useApp();
-import { NavLink } from "react-router-dom";
+import { NavLink } from "react-router-dom"; import { useApp } from "../context/AppContext";
 
-export default function NavBar({ theme, onThemeToggle, session, onLogout }) {
-  return (
-    <nav className="navbar">
-{session && (
-            <button type="button" className="ghost nav-btn" onClick={() => setEditorMode((v) => !v)} title={editorMode ? "Editor verlassen" : "Editor starten"}>
-              {editorMode ? "✅ Editor" : "✏️ Editor"}
-            </button>
-      <div className="navbar-brand"
-        <NavLink to="/">🛒 Einkaufsliste</NavLink>
-      </div>
-      <div className="navbar-links">
-        {session && (
-          <>
-            <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} end>
-              Startseite
-            </NavLink>
-            <NavLink to="/offers" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-              Angebote
-            </NavLink>
-            <NavLink to="/settings" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-              Einstellungen
-            </NavLink>
-          </>
-        )}
-        <button
-          type="button"
-          className="ghost nav-btn"
-          onClick={onThemeToggle}
-          title="Farbschema anpassen"
-        >
-          🎨
-        </button>
-        {session && (
-          <button type="button" className="danger nav-btn" onClick={onLogout}>
-            Abmelden
-          </button>
-        )}
-      </div>
-    </nav>
-  );
-}
+export default function NavBar({ session, onLogout }) { const { theme, editorMode, setEditorMode } = useApp();
+
+return ( <nav className="navbar"> <div className="navbar-left"> <button className="btn btn-text" onClick={() => setEditorMode(!editorMode)} > {editorMode ? "✅ Editor verlassen" : "✏️ Editor"} </button> </div> <div className="navbar-brand"> <NavLink to="/">🛒 Einkaufsliste</NavLink> </div> <div className="navbar-right"> <NavLink to="/settings">⚙️</NavLink> {session ? ( <a href="#" onClick={onLogout}> Abmelden ({session.username}) </a> ) : ( <NavLink to="/login">Anmelden</NavLink> )} <button className="btn-icon" onClick={theme.toggleDarkMode}> {theme.darkMode ? "🌞" : "🌚"} </button> </div> </nav> ); }
