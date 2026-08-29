@@ -36,7 +36,6 @@ try { initialEditorMode = localStorage.getItem(EDITOR_STORAGE_KEY) === "1"; } ca
 const AppContext = createContext();
 
 export function AppProvider({ children }) {
-export function AppProvider({ children }) {
   const [editorMode, setEditorMode] = useState(initialEditorMode);
   useEffect(() => {
     try { localStorage.setItem(EDITOR_STORAGE_KEY, editorMode ? "1" : "0"); } catch {}
