@@ -30,7 +30,7 @@ function normalizeWhitespace(text) {
 }
 
 function extractEuroPrice(text) {
-  const match = String(text || "").match(/(\d{1,3}(?:[.,]\d{1,2})?)\s*â‚¬/);
+  const match = String(text || "").match(/(\d{1,3}(?:[.,]\d{1,2})?)\s*€/);
   if (!match) {
     return null;
   }
@@ -95,6 +95,22 @@ async function fetchHtml(url) {
   return response.data;
 }
 
+function extractImgFrom(el, $) {
+  let img = $(el).find("img[src]").first();
+  if (!img || img.length === 0) {
+    img = $(el).find("img[data-src]").first();
+  }
+  let src = img.attr("src") || img.attr("data-src") || "";
+  if (!src) {
+    const parentImg = $(el).closest("article, div, li, section").find("img[src]").first();
+    src = parentImg.attr("src") || "";
+  }
+  if (!src) return null;
+  if (src.startsWith("http")) return src;
+  if (src.startsWith("//")) return "https:" + src;
+  return null;
+}
+
 function parseAldiOffers(html) {
   const $ = cheerio.load(html);
   const offers = [];
@@ -111,7 +127,7 @@ function parseAldiOffers(html) {
     }
 
     const text = normalizeWhitespace($(element).text());
-    if (!text || !text.includes("â‚¬")) {
+    if (!text || !text.includes("€")) {
       return;
     }
 
@@ -127,6 +143,7 @@ function parseAldiOffers(html) {
       url: href,
       market: "ALDI",
       source: "ALDI SUD",
+      image: extractImgFrom(element, $),
       fetchedAt: new Date().toISOString()
     });
   });
@@ -135,19 +152,6 @@ function parseAldiOffers(html) {
 }
 
 function parseGenericOffers(html, market, pageUrl) {
-      function extractImgFrom(el, $) {
-    var img = $(el).find("img[src]").first() || $(el).find("img[data-src]").first();
-    var src = img.attr("src") || $(el).find("img[data-src]").first().attr("data-src") || "";
-    if (!src) {
-      var parentImg = $(el).closest("article, div, li, section").find("img[src]").first();
-      src = parentImg.attr("src") || "";
-    }
-    if (!src) return null;
-    return src.startsWith("http") ? src : (src.startsWith("//") ? "https:" + src : null);
-  }
-    if (!src) return null;
-    return src.startsWith('http') ? src : (src.startsWith('//') ? 'https:' + src : null);
-  }
   const $ = cheerio.load(html);
   const offers = [];
   const seen = new Set();
@@ -172,7 +176,7 @@ function parseGenericOffers(html, market, pageUrl) {
     }
 
     const title = normalizeWhitespace($(element).text());
-    if (!title || title.length < 8 || title.length > 240 || !title.includes("â‚¬")) {
+    if (!title || title.length < 8 || title.length > 240 || !title.includes("€")) {
       return;
     }
 
@@ -296,5 +300,3 @@ export async function getLiveOffers(options = {}) {
     offers: paged
   };
 }
-
-

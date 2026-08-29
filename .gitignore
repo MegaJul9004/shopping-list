@@ -4,3 +4,5 @@ frontend/node_modules/
 backend/data/*.db
 .env
 .DS_Store
+frontend/dist/
+dist/

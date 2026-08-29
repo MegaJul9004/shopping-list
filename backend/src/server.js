@@ -35,20 +35,44 @@ import {
   searchBranchesByZip
 } from "./db.js";
 import { buildExportByMarket, compareMarkets } from "./offers.js";
+import {
+  getSupportedMarkets,
+  getDefaultMarketSource,
+  getMarketOffers,
+  getLiveOffers
+} from "./liveOffers.js";
+import { searchChefkoch } from "./recipeSearch.js";
+
+const familyCode = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 6);
+const jwtSecret = process.env.JWT_SECRET || "dev-secret-change-me-in-production";
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*" }
+  cors: { origin: process.env.FRONTEND_ORIGIN || "*" }
 });
 
 app.use(cors());
 app.use(express.json());
 
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
+app.get("/api/health", (_req, res) => {
+  res.json({ ok: true });
 });
 
+io.on("connection", (socket) => {
+  socket.on("joinFamily", (payload) => {
+    try {
+      const token = payload?.token;
+      if (!token) return;
+      const decoded = jwt.verify(token, jwtSecret);
+      if (decoded?.familyId) {
+        socket.join(decoded.familyId);
+      }
+    } catch {
+      // Invalid token - silently ignore
+    }
+  });
+});
 
 function emitItems(familyId) {
   const items = getItemsByFamily(familyId);
@@ -64,10 +88,6 @@ app.get("/api/branches/search", (req, res) => {
   } catch(e) {
     return res.json({ branches: [], error: e.message });
   }
-});
-
-app.get("/api/health", (_req, res) => {
-  res.json({ ok: true });
 });
 
 function issueToken(user) {
@@ -318,7 +338,7 @@ app.delete("/api/families/:familyId/items/:itemId", authMiddleware, (req, res) =
   return res.json({ ok: true });
 });
 
-// â”€â”€ Wiederkehrende Artikel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// —— Wiederkehrende Artikel ————————————————————————————————————————————
 app.get("/api/families/:familyId/recurring", authMiddleware, (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
 
@@ -374,7 +394,7 @@ app.delete(
   }
 );
 
-// â”€â”€ Markt-Standorte / Filialen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// —— Markt-Standorte / Filialen ———————————————————————————————————————
 app.get("/api/families/:familyId/locations", authMiddleware, (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
 
@@ -423,7 +443,7 @@ app.delete("/api/families/:familyId/branches/:market", authMiddleware, (req, res
   return res.json({ ok: true });
 });
 
-// â”€â”€ Legacy: einfache Standorte (Weiterleitung an Branches) â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// —— Legacy: einfache Standorte (Weiterleitung an Branches) ————————————
 app.post("/api/families/:familyId/locations", authMiddleware, (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
   const market = String(req.body?.market || "").trim().toUpperCase();
@@ -449,7 +469,7 @@ app.get("/api/offers/locations", (_req, res) => {
   return res.json({ locations });
 });
 
-// â”€â”€ Family Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// —— Family Settings ———————————————————————————————————————————————————
 app.get("/api/families/:familyId/settings", authMiddleware, (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
   if (req.auth.familyId !== familyId) {
@@ -470,7 +490,7 @@ app.post("/api/families/:familyId/settings", authMiddleware, (req, res) => {
   return res.json({ settings: updated });
 });
 
-// â”€â”€ Mini-Lists / Recipes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// —— Mini-Lists / Recipes —————————————————————————————————————————————
 app.get("/api/families/:familyId/mini-lists", authMiddleware, (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
   if (req.auth.familyId !== familyId) {
@@ -506,7 +526,7 @@ app.delete("/api/families/:familyId/mini-lists/:listId", authMiddleware, (req, r
   return res.json({ ok: true });
 });
 
-// â”€â”€ Offer Watchlist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// —— Offer Watchlist ———————————————————————————————————————————————————
 app.get("/api/families/:familyId/offer-watchlist", authMiddleware, (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
   if (req.auth.familyId !== familyId) {
@@ -541,7 +561,7 @@ app.delete("/api/families/:familyId/offer-watchlist/:watchId", authMiddleware, (
   return res.json({ ok: true });
 });
 
-// â”€â”€ Recipe Search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// —— Recipe Search —————————————————————————————————————————————————————
 app.get("/api/recipes/search", async (req, res) => {
   const query = String(req.query.q || "").trim();
   if (!query) {
