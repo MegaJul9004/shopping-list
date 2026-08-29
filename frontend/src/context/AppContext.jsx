@@ -95,9 +95,19 @@ export function AppProvider({ children }) {
     setTheme({ primary: "#0d6e6e", accent: "#ef8354", bgTop: "#f9f3e7", bgBottom: "#e2f3ff" });
   };
 
-<AppContext.Provider value={{ session, setSession, settings, updateSettings, theme, updateTheme, resetTheme, editorMode, setEditorMode }}>
   return (
-    <AppContext.Provider value={{ session, setSession, settings, updateSettings, theme, updateTheme, resetTheme }}>
+    <AppContext.Provider 
+      value={{
+        session,
+        setSession,
+        settings,
+        updateSettings,
+        theme,
+        updateTheme,
+        resetTheme,
+        editorMode,
+        setEditorMode
+      }}
       {children}
     </AppContext.Provider>
   );
