@@ -13,6 +13,9 @@ function getSocket() {
 }
 
 const DAY_NAMES = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+const DEFAULT_CARD_ORDER = ["shopping", "minilists", "recurring", "recipes"];
+const CARD_STORAGE_KEY = "shopping_card_order";
+const EDITOR_STORAGE_KEY = "shopping_editor_mode";
 
 export default function App() {
   const { session, setSession, settings, theme } = useApp();
@@ -44,6 +47,29 @@ export default function App() {
   const [showMiniListEditor, setShowMiniListEditor] = useState(false);
   const [miniListItemInput, setMiniListItemInput] = useState("");
   const [miniListItems, setMiniListItems] = useState([]);
+  const [editorMode, setEditorMode] = useState(() => {
+    try { return localStorage.getItem(EDITOR_STORAGE_KEY) === "1"; } catch { return false; }
+  });
+  const [cardOrder, setCardOrder] = useState(() => {
+    try {
+      const saved = localStorage.getItem(CARD_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length === 4) return parsed;
+      }
+    } catch {}
+    return DEFAULT_CARD_ORDER.slice();
+  });
+  const dragSrcIdx = useRef(-1);
+  const [dragOverIdx, setDragOverIdx] = useState(-1);
+
+  useEffect(() => {
+    try { localStorage.setItem(EDITOR_STORAGE_KEY, editorMode ? "1" : "0"); } catch {}
+  }, [editorMode]);
+
+  useEffect(() => {
+    try { localStorage.setItem(CARD_STORAGE_KEY, JSON.stringify(cardOrder)); } catch {}
+  }, [cardOrder]);
 
   useEffect(() => {
     if (!session) return;
@@ -191,6 +217,42 @@ export default function App() {
       } catch (e) { setError(e.message); }
     }
   };
+
+  const resetCardOrder = () => {
+    setCardOrder(DEFAULT_CARD_ORDER.slice());
+  };
+
+  const handleDragStart = (e, idx) => {
+    dragSrcIdx.current = idx;
+    e.dataTransfer.effectAllowed = "move";
+    try { e.dataTransfer.setData("text/plain", String(idx)); } catch {}
+  };
+  const handleDragOver = (e, idx) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverIdx !== idx) setDragOverIdx(idx);
+  };
+  const handleDragLeave = () => {
+    setDragOverIdx(-1);
+  };
+  const handleDrop = (e, idx) => {
+    e.preventDefault();
+    const src = dragSrcIdx.current;
+    setDragOverIdx(-1);
+    dragSrcIdx.current = -1;
+    if (src < 0 || src === idx) return;
+    setCardOrder((prev) => {
+      const next = prev.slice();
+      const [moved] = next.splice(src, 1);
+      next.splice(idx, 0, moved);
+      return next;
+    });
+  };
+  const handleDragEnd = () => {
+    dragSrcIdx.current = -1;
+    setDragOverIdx(-1);
+  };
+
   const renderAuth = () => (
     <section className="card">
       <h2>{registerMode === "create" ? "Neue Familie erstellen" : "Familie beitreten"}</h2>
@@ -215,6 +277,136 @@ export default function App() {
       </form>
     </section>
   );
+
+  const CardShopping = () => (
+    <section className="card" data-card-id="shopping">
+      <div className="card-header-row">
+        <h2>Einkaufsliste</h2>
+        {editorMode && <span className="editor-card-badge">Position {cardOrder.indexOf("shopping") + 1}</span>}
+      </div>
+      <div className="family-chip">
+        <span className="muted">Menge erhöhen: {settings.duplicateBehavior === "merge" ? "\u2705 An" : "\u274c Aus"}</span>
+        <Link to="/settings">Einstellungen</Link>
+      </div>
+      <div className="add-form">
+        <input type="text" placeholder="Artikel eingeben" value={itemName} onChange={(e) => setItemName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addItem()} />
+        <input type="number" min={1} value={itemQty} onChange={(e) => setItemQty(Math.max(1, Number(e.target.value)))} />
+        <button type="button" onClick={addItem}>Hinzufügen</button>
+      </div>
+      <ul className="list">
+        {items.map((item) => (
+          <li key={item.id} className={item.checked ? "checked" : ""}>
+            <label className="item-row">
+              <input type="checkbox" checked={item.checked} onChange={() => toggleItem(item.id, item.checked)} />
+              <span className="item-name">{item.name}</span>
+              <span className="item-qty">{item.quantity}x</span>
+            </label>
+            <div className="item-actions">
+              <button className="ghost" onClick={() => { setItemName(item.name); setItemQty(item.quantity); deleteItem(item.id); }}>Bearbeiten</button>
+              <button className="danger" onClick={() => deleteItem(item.id)}>Löschen</button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+
+  const CardMiniLists = () => (
+    <section className="card" data-card-id="minilists">
+      <div className="card-header-row">
+        <h2>📋 Mini-Listen</h2>
+        {editorMode && <span className="editor-card-badge">Position {cardOrder.indexOf("minilists") + 1}</span>}
+      </div>
+      <div className="add-form" style={{gridTemplateColumns:"1fr auto"}}>
+        <input type="text" placeholder="Listenname" value={miniListName} onChange={(e) => setMiniListName(e.target.value)} />
+        <button type="button" onClick={() => setShowMiniListEditor(true)}>+ Neu</button>
+      </div>
+      {showMiniListEditor && (
+        <div className="mini-form">
+          <input type="text" placeholder="Zutat (Enter)" value={miniListItemInput} onChange={(e) => setMiniListItemInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && miniListItemInput.trim()) { setMiniListItems([...miniListItems, {name: miniListItemInput.trim(), quantity: 1}]); setMiniListItemInput(""); }}} />
+          <ul className="recurring-list" style={{margin:"0.4rem 0"}}>
+            {miniListItems.map((mi, idx) => (
+              <li key={idx}><span>{mi.name} ({mi.quantity}x)</span><button className="danger" onClick={() => setMiniListItems(miniListItems.filter((_, i) => i !== idx))}>✕</button></li>
+            ))}
+          </ul>
+          <div className="switch-row">
+            <button onClick={saveMiniList}>Speichern</button>
+            <button className="ghost" onClick={() => { setShowMiniListEditor(false); setMiniListItems([]); }}>Abbrechen</button>
+          </div>
+        </div>
+      )}
+      {miniLists.length > 0 && (
+        <ul className="recurring-list">
+          {miniLists.map((ml) => (
+            <li key={ml.id}>
+              <div><strong>{ml.name}</strong><p className="muted">{ml.items.length} Zutaten</p></div>
+              <div className="item-actions">
+                <button onClick={() => addMiniListToShopping(ml)}>+ Zur Liste</button>
+                <button className="danger" onClick={() => deleteMiniList(ml.id)}>✕</button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+
+  const CardRecurring = () => (
+    <section className="card" data-card-id="recurring">
+      <div className="card-header-row">
+        <h2>🔄 Wiederkehrende Artikel</h2>
+        {editorMode && <span className="editor-card-badge">Position {cardOrder.indexOf("recurring") + 1}</span>}
+      </div>
+      <div className="recurring-form">
+        <input type="text" placeholder="Artikel" value={recurName} onChange={(e) => setRecurName(e.target.value)} />
+        <input type="number" min={1} value={recurQty} onChange={(e) => setRecurQty(Math.max(1, Number(e.target.value)))} />
+        <select value={recurDay} onChange={(e) => setRecurDay(Number(e.target.value))}>
+          {DAY_NAMES.map((name, idx) => <option key={idx} value={idx}>{name}</option>)}
+        </select>
+        <button type="button" onClick={addRecurring}>+ Hinzufügen</button>
+      </div>
+      {recurringItems.length > 0 && (
+        <ul className="recurring-list">
+          {recurringItems.map((ritem) => (
+            <li key={ritem.id}><span>{ritem.name} ({ritem.quantity}x) - <span className="muted">{DAY_NAMES[ritem.dayOfWeek]}</span></span><button className="danger" onClick={() => deleteRecurring(ritem.id)}>✕</button></li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+
+  const CardRecipes = () => (
+    <section className="card" data-card-id="recipes">
+      <div className="card-header-row">
+        <h2>🍳 Rezepte finden</h2>
+        {editorMode && <span className="editor-card-badge">Position {cardOrder.indexOf("recipes") + 1}</span>}
+      </div>
+      <div className="recipe-form">
+        <input type="text" placeholder="Suchbegriff" value={recipeQuery} onChange={(e) => setRecipeQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && searchRecipes()} />
+        <button type="button" onClick={searchRecipes} disabled={loadingRecipes}>{loadingRecipes ? "Suche..." : "Suchen"}</button>
+      </div>
+      {recipes.length > 0 && (
+        <ul className="list">{recipes.map((r, i) => <li key={i}><a href={r.url} target="_blank" rel="noreferrer">{r.title}</a></li>)}</ul>
+      )}
+      <p className="muted" style={{marginTop:"0.5rem"}}>Oder nach Zutaten:</p>
+      <div className="recipe-filters">
+        <input type="text" placeholder="Zutat (Enter)" value={ingredientInput} onChange={(e) => setIngredientInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && ingredientInput.trim()) { setSelectedIngredients([...selectedIngredients, ingredientInput.trim()]); setIngredientInput(""); }}} />
+        <button type="button" onClick={searchByIngredients} disabled={selectedIngredients.length === 0 || loadingRecipes}>{loadingRecipes ? "Suche..." : "Rezepte finden"}</button>
+      </div>
+      <div className="family-chip">
+        {selectedIngredients.map((ing, idx) => (
+          <span key={idx} className="tag">{ing}<button className="danger" onClick={() => setSelectedIngredients(selectedIngredients.filter((_, i) => i !== idx))}>✕</button></span>
+        ))}
+      </div>
+    </section>
+  );
+
+  const CARD_COMPONENTS = {
+    shopping: CardShopping,
+    minilists: CardMiniLists,
+    recurring: CardRecurring,
+    recipes: CardRecipes
+  };
 
   return (
     <div>
@@ -246,121 +438,65 @@ export default function App() {
         ) : (
           <>
             <header className="hero">
-              <p className="eyebrow">Family Sync</p>
+              <p className="eyebrow">Family Sync{editorMode ? " · Editor-Modus aktiv" : ""}</p>
               <h1>Gemeinsame Einkaufsliste</h1>
               <p className="muted" style={{color:"#cde3e3",marginTop:"0.4rem"}}>Familie: {session.familyName} · Code: {session.familyId}</p>
-              <div style={{display:"flex",gap:"0.5rem",marginTop:"0.6rem"}}>
+              <div style={{display:"flex",gap:"0.5rem",marginTop:"0.6rem",flexWrap:"wrap"}}>
                 <Link to="/settings" className="btn-inline">⚙️ Einstellungen</Link>
                 <Link to="/offers" className="btn-inline">🏷️ Angebote</Link>
+                <button
+                  type="button"
+                  className="btn-inline"
+                  style={{
+                    background: editorMode ? "rgba(239,131,84,0.85)" : "rgba(255,255,255,0.2)",
+                    border: editorMode ? "2px solid #fff" : "none"
+                  }}
+                  onClick={() => setEditorMode((v) => !v)}
+                  title="Editor-Modus: Karten frei anordnen"
+                >
+                  {editorMode ? "✅ Editor verlassen" : "✏️ Editor starten"}
+                </button>
+                {editorMode && (
+                  <button type="button" className="btn-inline ghost-btn-inline" onClick={resetCardOrder}>
+                    ↺ Reihenfolge zurücksetzen
+                  </button>
+                )}
               </div>
+              {editorMode && (
+                <p style={{marginTop:"0.8rem",padding:"0.6rem 0.9rem",background:"rgba(255,255,255,0.18)",borderRadius:"10px",fontSize:"0.9rem"}}>
+                  🖱️ Ziehe die Karten per Drag &amp; Drop in die gewünschte Reihenfolge – die Anordnung wird automatisch in deinem Browser gespeichert.
+                </p>
+              )}
             </header>
             {error && <div className="error-banner">{error}</div>}
 
-            <div className="dashboard-grid">
-              <section className="card">
-                <h2>Einkaufsliste</h2>
-                <div className="family-chip">
-                  <span className="muted">Menge erhöhen: {settings.duplicateBehavior === "merge" ? "\u2705 An" : "\u274c Aus"}</span>
-                  <Link to="/settings">Einstellungen</Link>
-                </div>
-                <div className="add-form">
-                  <input type="text" placeholder="Artikel eingeben" value={itemName} onChange={(e) => setItemName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addItem()} />
-                  <input type="number" min={1} value={itemQty} onChange={(e) => setItemQty(Math.max(1, Number(e.target.value)))} />
-                  <button type="button" onClick={addItem}>Hinzufügen</button>
-                </div>
-                <ul className="list">
-                  {items.map((item) => (
-                    <li key={item.id} className={item.checked ? "checked" : ""}>
-                      <label className="item-row">
-                        <input type="checkbox" checked={item.checked} onChange={() => toggleItem(item.id, item.checked)} />
-                        <span className="item-name">{item.name}</span>
-                        <span className="item-qty">{item.quantity}x</span>
-                      </label>
-                      <div className="item-actions">
-                        <button className="ghost" onClick={() => { setItemName(item.name); setItemQty(item.quantity); deleteItem(item.id); }}>Bearbeiten</button>
-                        <button className="danger" onClick={() => deleteItem(item.id)}>Löschen</button>
+            <div className={"dashboard-grid editor-allcards" + (editorMode ? " editor-active" : "")}>
+              {cardOrder.map((cardId, idx) => {
+                const Comp = CARD_COMPONENTS[cardId];
+                if (!Comp) return null;
+                const isDragOver = dragOverIdx === idx;
+                return (
+                  <div
+                    key={cardId}
+                    className={"editor-card-wrap" + (editorMode ? " draggable" : "") + (isDragOver ? " drag-over" : "")}
+                    draggable={editorMode}
+                    onDragStart={(e) => editorMode && handleDragStart(e, idx)}
+                    onDragOver={(e) => editorMode && handleDragOver(e, idx)}
+                    onDragLeave={(e) => editorMode && handleDragLeave(e)}
+                    onDrop={(e) => editorMode && handleDrop(e, idx)}
+                    onDragEnd={handleDragEnd}
+                  >
+                    {editorMode && (
+                      <div className="editor-drag-handle" title="Karte verschieben">
+                        <span>⋮⋮</span>
+                        <span className="editor-pos-label">{idx + 1}</span>
+                        <span className="editor-move-label">Verschieben</span>
                       </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-
-              <section className="card">
-                <h2>📋 Mini-Listen</h2>
-                <div className="add-form" style={{gridTemplateColumns:"1fr auto"}}>
-                  <input type="text" placeholder="Listenname" value={miniListName} onChange={(e) => setMiniListName(e.target.value)} />
-                  <button type="button" onClick={() => setShowMiniListEditor(true)}>+ Neu</button>
-                </div>
-                {showMiniListEditor && (
-                  <div className="mini-form">
-                    <input type="text" placeholder="Zutat (Enter)" value={miniListItemInput} onChange={(e) => setMiniListItemInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && miniListItemInput.trim()) { setMiniListItems([...miniListItems, {name: miniListItemInput.trim(), quantity: 1}]); setMiniListItemInput(""); }}} />
-                    <ul className="recurring-list" style={{margin:"0.4rem 0"}}>
-                      {miniListItems.map((mi, idx) => (
-                        <li key={idx}><span>{mi.name} ({mi.quantity}x)</span><button className="danger" onClick={() => setMiniListItems(miniListItems.filter((_, i) => i !== idx))}>✕</button></li>
-                      ))}
-                    </ul>
-                    <div className="switch-row">
-                      <button onClick={saveMiniList}>Speichern</button>
-                      <button className="ghost" onClick={() => { setShowMiniListEditor(false); setMiniListItems([]); }}>Abbrechen</button>
-                    </div>
+                    )}
+                    <Comp />
                   </div>
-                )}
-                {miniLists.length > 0 && (
-                  <ul className="recurring-list">
-                    {miniLists.map((ml) => (
-                      <li key={ml.id}>
-                        <div><strong>{ml.name}</strong><p className="muted">{ml.items.length} Zutaten</p></div>
-                        <div className="item-actions">
-                          <button onClick={() => addMiniListToShopping(ml)}>+ Zur Liste</button>
-                          <button className="danger" onClick={() => deleteMiniList(ml.id)}>✕</button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            </div>
-
-            <div className="dashboard-grid wide" style={{marginTop:"1rem"}}>
-              <section className="card">
-                <h2>🔄 Wiederkehrende Artikel</h2>
-                <div className="recurring-form">
-                  <input type="text" placeholder="Artikel" value={recurName} onChange={(e) => setRecurName(e.target.value)} />
-                  <input type="number" min={1} value={recurQty} onChange={(e) => setRecurQty(Math.max(1, Number(e.target.value)))} />
-                  <select value={recurDay} onChange={(e) => setRecurDay(Number(e.target.value))}>
-                    {DAY_NAMES.map((name, idx) => <option key={idx} value={idx}>{name}</option>)}
-                  </select>
-                  <button type="button" onClick={addRecurring}>+ Hinzufügen</button>
-                </div>
-                {recurringItems.length > 0 && (
-                  <ul className="recurring-list">
-                    {recurringItems.map((ritem) => (
-                      <li key={ritem.id}><span>{ritem.name} ({ritem.quantity}x) - <span className="muted">{DAY_NAMES[ritem.dayOfWeek]}</span></span><button className="danger" onClick={() => deleteRecurring(ritem.id)}>✕</button></li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-
-              <section className="card">
-                <h2>🍳 Rezepte finden</h2>
-                <div className="recipe-form">
-                  <input type="text" placeholder="Suchbegriff" value={recipeQuery} onChange={(e) => setRecipeQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && searchRecipes()} />
-                  <button type="button" onClick={searchRecipes} disabled={loadingRecipes}>{loadingRecipes ? "Suche..." : "Suchen"}</button>
-                </div>
-                {recipes.length > 0 && (
-                  <ul className="list">{recipes.map((r, i) => <li key={i}><a href={r.url} target="_blank" rel="noreferrer">{r.title}</a></li>)}</ul>
-                )}
-                <p className="muted" style={{marginTop:"0.5rem"}}>Oder nach Zutaten:</p>
-                <div className="recipe-filters">
-                  <input type="text" placeholder="Zutat (Enter)" value={ingredientInput} onChange={(e) => setIngredientInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && ingredientInput.trim()) { setSelectedIngredients([...selectedIngredients, ingredientInput.trim()]); setIngredientInput(""); }}} />
-                  <button type="button" onClick={searchByIngredients} disabled={selectedIngredients.length === 0 || loadingRecipes}>{loadingRecipes ? "Suche..." : "Rezepte finden"}</button>
-                </div>
-                <div className="family-chip">
-                  {selectedIngredients.map((ing, idx) => (
-                    <span key={idx} className="tag">{ing}<button className="danger" onClick={() => setSelectedIngredients(selectedIngredients.filter((_, i) => i !== idx))}>✕</button></span>
-                  ))}
-                </div>
-              </section>
+                );
+              })}
             </div>
           </>
         )}
@@ -368,4 +504,3 @@ export default function App() {
     </div>
   );
 }
-

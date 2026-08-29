@@ -609,6 +609,25 @@ app.get("/api/offers/markets", (_req, res) => {
   return res.json({ markets: getSupportedMarkets() });
 });
 
+// Live offers per market with user-specific branch URLs
+app.get("/api/offers/live", authMiddleware, async (req, res) => {
+  const market = String(req.query.market || "ALL").toUpperCase();
+  const offset = Number(req.query.offset || "0");
+  const limit = Number(req.query.limit || "20");
+  const forceRefresh = String(req.query.refresh || "0") === "1";
+  const weekOffset = Math.max(0, Math.min(4, Number(req.query.week || req.query.weekOffset || 0)));
+
+  // Load user-specific branch locations
+  const branchLocs = getFamilyBranchLocations(req.auth.familyId);
+  const locations = Object.fromEntries(
+    Object.entries(branchLocs).map(([marketKey, b]) => [marketKey, { url: b.locationUrl }])
+  );
+
+  // Fetch live offers with user locations
+  const payload = await getLiveOffers({ market, offset, limit, forceRefresh, weekOffset, locations });
+  return res.json(payload);
+});
+
 app.get("/api/offers/live", async (req, res) => {
   const market = String(req.query.market || "ALL").toUpperCase();
   const offset = Number(req.query.offset || 0);

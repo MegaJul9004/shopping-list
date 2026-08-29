@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
+const EDITOR_STORAGE_KEY = "shopping_editor_mode";
 
 export async function api(endpoint, options = {}, token = null) {
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -23,12 +24,23 @@ export async function api(endpoint, options = {}, token = null) {
     throw new Error(errData.message || `Fehler ${response.status}`);
   }
 
+const AppContext = createContext();
+
+// Editor mode state in context
+let initialEditorMode = false;
+try { initialEditorMode = localStorage.getItem(EDITOR_STORAGE_KEY) === "1"; } catch {}
+
   return response.json();
 }
 
 const AppContext = createContext();
 
 export function AppProvider({ children }) {
+export function AppProvider({ children }) {
+  const [editorMode, setEditorMode] = useState(initialEditorMode);
+  useEffect(() => {
+    try { localStorage.setItem(EDITOR_STORAGE_KEY, editorMode ? "1" : "0"); } catch {}
+  }, [editorMode]);
   const [session, setSession] = useState(() => {
     const saved = localStorage.getItem("shopping_session");
     if (!saved) return null;
@@ -84,6 +96,7 @@ export function AppProvider({ children }) {
     setTheme({ primary: "#0d6e6e", accent: "#ef8354", bgTop: "#f9f3e7", bgBottom: "#e2f3ff" });
   };
 
+<AppContext.Provider value={{ session, setSession, settings, updateSettings, theme, updateTheme, resetTheme, editorMode, setEditorMode }}>
   return (
     <AppContext.Provider value={{ session, setSession, settings, updateSettings, theme, updateTheme, resetTheme }}>
       {children}

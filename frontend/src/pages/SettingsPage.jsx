@@ -247,7 +247,7 @@ export default function SettingsPage() {
         </section>
       </div>
       <div style={{ display: "flex", justifyContent: "center", marginTop: "1rem" }}>
-        <Link to="/" className="btn-inline">← Zurück zum Dashboard</Link>
+        <Link to="/" className="btn-inline">← Zurück zur Startseite</Link>
       </div>
     </div>
   );

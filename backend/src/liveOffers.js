@@ -6,24 +6,90 @@ const cache = new Map();
 
 const SUPPORTED_MARKETS = ["LIDL", "EDEKA", "ALDI", "REWE"];
 
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function getMondayOf(d) {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = (day + 6) % 7;
+  date.setDate(date.getDate() - diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function addDays(date, n) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+function getWeekDates(weekOffset = 0) {
+  const monday = addDays(getMondayOf(new Date()), weekOffset * 7);
+  const sunday = addDays(monday, 6);
+  return {
+    monday,
+    sunday,
+    start: `${monday.getFullYear()}-${pad2(monday.getMonth() + 1)}-${pad2(monday.getDate())}`,
+    end: `${sunday.getFullYear()}-${pad2(sunday.getMonth() + 1)}-${pad2(sunday.getDate())}`,
+    startDE: `${pad2(monday.getDate())}.${pad2(monday.getMonth() + 1)}.${monday.getFullYear()}`,
+    endDE: `${pad2(sunday.getDate())}.${pad2(sunday.getMonth() + 1)}.${sunday.getFullYear()}`
+  };
+}
+
+function isNextWeekAvailable() {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const hour = today.getHours();
+  if (dayOfWeek >= 4 && hour >= 12) return true;
+  if (dayOfWeek >= 5) return true;
+  return false;
+}
+
+const USER_PROVIDED_URLS = {
+  LIDL: "https://www.lidl.de/l/prospekte/aktionsprospekt-24-08-2026-29-08-2026-6dfc61/view/flyer/page/1?_ab=1&lf=HHZ",
+  EDEKA: "https://www.edeka.de/maerkte/801341/angebote/",
+  ALDI: "https://www.aldi-nord.de/angebote.html",
+  REWE: "https://www.rewe.de/angebote/burgdorf/540824/rewe-markt-marktstr-27/"
+};
+
 const DEFAULT_MARKET_SOURCES = {
   ALDI: {
-    label: "ALDI SUD",
-    url: "https://www.aldi-sued.de/angebote"
+    label: "ALDI NORD",
+    url: USER_PROVIDED_URLS.ALDI
   },
   LIDL: {
     label: "LIDL",
-    url: "https://www.lidl.de/angebote"
+    url: USER_PROVIDED_URLS.LIDL
   },
   EDEKA: {
     label: "EDEKA",
-    url: "https://www.edeka.de/angebote"
+    url: USER_PROVIDED_URLS.EDEKA
   },
   REWE: {
     label: "REWE",
-    url: "https://www.rewe.de/angebote"
+    url: USER_PROVIDED_URLS.REWE
   }
 };
+
+function buildWeeklyUrl(market, weekOffset, configuredUrl) {
+  const fallback = configuredUrl || DEFAULT_MARKET_SOURCES[market]?.url || "";
+  if (weekOffset === 0) return fallback;
+  const wk = getWeekDates(weekOffset);
+  switch (market) {
+    case "LIDL":
+      return `https://www.lidl.de/l/prospekte/aktionsprospekt-${wk.start.replace(/-/g, ".")}-${wk.end.replace(/-/g, ".")}/view/flyer/page/1?_ab=1&lf=HHZ`;
+    case "EDEKA":
+      return USER_PROVIDED_URLS.EDEKA;
+    case "ALDI":
+      return `https://www.aldi-nord.de/angebote.html?week=${wk.start}`;
+    case "REWE":
+      return USER_PROVIDED_URLS.REWE;
+    default:
+      return fallback;
+  }
+}
 
 function normalizeWhitespace(text) {
   return String(text || "").replace(/\s+/g, " ").trim();
@@ -87,10 +153,12 @@ function isValidHttpUrl(value) {
 async function fetchHtml(url) {
   const response = await axios.get(url, {
     headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-      Accept: "text/html"
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 FamilyShoppingList/1.0",
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7"
     },
-    timeout: 10000
+    timeout: 10000,
+    maxRedirects: 5
   });
   return response.data;
 }
@@ -116,12 +184,12 @@ function parseAldiOffers(html) {
   const offers = [];
   const seen = new Set();
 
-  $("a[href*='/produkt/']").each((_, element) => {
+  $("a[href*='/produkt/'], a[href*='/angebot/'], article a").each((_, element) => {
     if (offers.length >= 220) {
       return;
     }
 
-    const href = absoluteUrl("https://www.aldi-sued.de", $(element).attr("href"));
+    const href = absoluteUrl("https://www.aldi-nord.de", $(element).attr("href"));
     if (!href || seen.has(href)) {
       return;
     }
@@ -142,7 +210,7 @@ function parseAldiOffers(html) {
       price,
       url: href,
       market: "ALDI",
-      source: "ALDI SUD",
+      source: "ALDI NORD",
       image: extractImgFrom(element, $),
       fetchedAt: new Date().toISOString()
     });
@@ -203,23 +271,47 @@ function parseGenericOffers(html, market, pageUrl) {
   return offers;
 }
 
-async function fetchLiveOffersForMarket(market, sourceUrl) {
-  const fallback = DEFAULT_MARKET_SOURCES[market]?.url;
-  const pageUrl = isValidHttpUrl(sourceUrl) ? sourceUrl : fallback;
+async function fetchLiveOffersForMarket(market, sourceUrl, weekOffset) {
+  const pageUrl = isValidHttpUrl(sourceUrl) ? sourceUrl : buildWeeklyUrl(market, weekOffset);
 
   if (!pageUrl) {
-    return [];
+    return { offers: [], available: false, reason: "Keine URL konfiguriert" };
   }
 
-  const html = await fetchHtml(pageUrl);
+  if (weekOffset > 0 && !isNextWeekAvailable()) {
+    return { offers: [], available: false, reason: "Angebote der nächsten Woche sind noch nicht verfügbar" };
+  }
+
+  let html;
+  try {
+    html = await fetchHtml(pageUrl);
+  } catch (e) {
+    if (weekOffset > 0) {
+      return { offers: [], available: false, reason: "Angebote der nächsten Woche sind noch nicht verfügbar" };
+    }
+    return { offers: [], available: false, reason: e instanceof Error ? e.message : "Unbekannter Fehler" };
+  }
+
+  if (!html || String(html).trim().length < 1000) {
+    if (weekOffset > 0) {
+      return { offers: [], available: false, reason: "Angebote der nächsten Woche sind noch nicht verfügbar" };
+    }
+    return { offers: [], available: false, reason: "Leere Seite empfangen" };
+  }
+
   const generic = parseGenericOffers(html, market, pageUrl);
 
   if (market === "ALDI") {
     const aldiSpecific = parseAldiOffers(html);
-    return mergeAndDedupeOffers([...aldiSpecific, ...generic]);
+    const merged = mergeAndDedupeOffers([...aldiSpecific, ...generic]);
+    return { offers: merged, available: true, pageUrl };
   }
 
-  return generic;
+  if (generic.length === 0 && weekOffset > 0) {
+    return { offers: [], available: false, reason: "Angebote der nächsten Woche sind noch nicht verfügbar" };
+  }
+
+  return { offers: generic, available: true, pageUrl };
 }
 
 export function getSupportedMarkets() {
@@ -230,31 +322,46 @@ export function getDefaultMarketSource(market) {
   return DEFAULT_MARKET_SOURCES[market]?.url || null;
 }
 
+export function getWeekInfo(weekOffset = 0) {
+  const wk = getWeekDates(Number(weekOffset) || 0);
+  return {
+    offset: Number(weekOffset) || 0,
+    label: weekOffset === 0 ? "Diese Woche" : `Nächste Woche (+${weekOffset})`,
+    start: wk.start,
+    end: wk.end,
+    startDE: wk.startDE,
+    endDE: wk.endDE,
+    available: weekOffset === 0 ? true : isNextWeekAvailable()
+  };
+}
+
 export async function getMarketOffers(market, options = {}) {
   const key = String(market || "").toUpperCase();
   if (!SUPPORTED_MARKETS.includes(key)) {
-    return [];
+    return { offers: [], available: false, reason: "Unbekannter Markt" };
   }
 
   const forceRefresh = Boolean(options.forceRefresh);
   const sourceUrl = isValidHttpUrl(options.sourceUrl) ? options.sourceUrl : "";
-  const cacheKey = sourceUrl ? `${key}|${sourceUrl}` : key;
+  const weekOffset = Math.max(0, Math.min(4, Number(options.weekOffset || 0)));
+  const cacheKey = `${key}|${weekOffset}|${sourceUrl ? sourceUrl : "default"}`;
   const now = Date.now();
   const cached = cache.get(cacheKey);
 
   if (!forceRefresh && cached && now - cached.timestamp < TTL_MS) {
-    return cached.offers;
+    return cached.value;
   }
 
   try {
-    const offers = await fetchLiveOffersForMarket(key, sourceUrl);
-    cache.set(cacheKey, { timestamp: now, offers });
-    return offers;
-  } catch {
-    if (cached?.offers) {
-      return cached.offers;
+    const value = await fetchLiveOffersForMarket(key, sourceUrl, weekOffset);
+    cache.set(cacheKey, { timestamp: now, value });
+    return value;
+  } catch (e) {
+    const fallback = cached?.value || { offers: [], available: false, reason: "Fehler beim Abrufen" };
+    if (weekOffset > 0 && fallback.offers.length === 0) {
+      return { offers: [], available: false, reason: "Angebote der nächsten Woche sind noch nicht verfügbar" };
     }
-    return [];
+    return fallback;
   }
 }
 
@@ -264,30 +371,36 @@ export async function getLiveOffers(options = {}) {
   const limit = Math.max(1, Math.min(50, Number(options.limit || 20)));
   const forceRefresh = Boolean(options.forceRefresh);
   const locations = options.locations || {};
+  const weekOffset = Math.max(0, Math.min(4, Number(options.weekOffset || 0)));
 
   const markets =
     market === "ALL"
       ? SUPPORTED_MARKETS
       : SUPPORTED_MARKETS.filter((entry) => entry === market);
 
-  const marketData = await Promise.all(
+  const marketResults = await Promise.all(
     markets.map(async (entry) => {
       const configuredUrl = locations?.[entry]?.url;
-      const offers = await getMarketOffers(entry, {
+      const result = await getMarketOffers(entry, {
         forceRefresh,
-        sourceUrl: configuredUrl
+        sourceUrl: configuredUrl,
+        weekOffset
       });
-      return offers;
+      return { market: entry, ...result };
     })
   );
 
-  const allOffers = marketData
-    .flat()
+  const allOffers = marketResults
+    .flatMap((r) => r.offers || [])
     .sort((a, b) => {
       const aTs = new Date(a.fetchedAt || 0).getTime();
       const bTs = new Date(b.fetchedAt || 0).getTime();
       return bTs - aTs;
     });
+
+  const unavailableMarkets = marketResults
+    .filter((r) => r.available === false)
+    .map((r) => ({ market: r.market, reason: r.reason }));
 
   const paged = allOffers.slice(offset, offset + limit);
 
@@ -297,6 +410,8 @@ export async function getLiveOffers(options = {}) {
     offset,
     limit,
     hasMore: offset + limit < allOffers.length,
-    offers: paged
+    offers: paged,
+    week: getWeekInfo(weekOffset),
+    unavailableMarkets: unavailableMarkets.length > 0 ? unavailableMarkets : null
   };
 }

@@ -1,8 +1,15 @@
+import { useApp } from "../context/AppContext";
+export default function NavBar({ theme, onThemeToggle, session, onLogout }) {
+  const { editorMode, setEditorMode } = useApp();
 import { NavLink } from "react-router-dom";
 
 export default function NavBar({ theme, onThemeToggle, session, onLogout }) {
   return (
     <nav className="navbar">
+{session && (
+            <button type="button" className="ghost nav-btn" onClick={() => setEditorMode((v) => !v)} title={editorMode ? "Editor verlassen" : "Editor starten"}>
+              {editorMode ? "✅ Editor" : "✏️ Editor"}
+            </button>
       <div className="navbar-brand">
         <NavLink to="/">🛒 Einkaufsliste</NavLink>
       </div>
@@ -10,7 +17,7 @@ export default function NavBar({ theme, onThemeToggle, session, onLogout }) {
         {session && (
           <>
             <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} end>
-              Dashboard
+              Startseite
             </NavLink>
             <NavLink to="/offers" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
               Angebote
