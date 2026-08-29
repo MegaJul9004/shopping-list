@@ -10,7 +10,7 @@ export default function NavBar({ theme, onThemeToggle, session, onLogout }) {
             <button type="button" className="ghost nav-btn" onClick={() => setEditorMode((v) => !v)} title={editorMode ? "Editor verlassen" : "Editor starten"}>
               {editorMode ? "✅ Editor" : "✏️ Editor"}
             </button>
-      <div className="navbar-brand">
+      <div className="navbar-brand"
         <NavLink to="/">🛒 Einkaufsliste</NavLink>
       </div>
       <div className="navbar-links">

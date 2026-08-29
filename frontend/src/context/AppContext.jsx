@@ -108,6 +108,7 @@ export function AppProvider({ children }) {
         editorMode,
         setEditorMode
       }}
+>
       {children}
     </AppContext.Provider>
   );
