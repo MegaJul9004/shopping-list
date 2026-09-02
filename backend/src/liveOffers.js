@@ -1,18 +1,25 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 
-// Lazy Puppeteer-Import (wird erst beim ersten Browser-Rendering geladen)
+// Lazy Playwright-Import (wird erst beim ersten Browser-Rendering geladen)
 let browserPromise = null;
 async function getBrowser() {
   if (!browserPromise) {
     try {
-      const puppeteer = (await import("puppeteer")).default;
-      browserPromise = puppeteer.launch({
-        headless: "new",
-        args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
+      const { chromium } = await import("playwright");
+      // headless: true nutzt Chromium Headless Shell; headless: false = voller Chrome für Bot-Schutz-Websites
+      browserPromise = chromium.launch({
+        headless: true,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+          "--lang=de-DE,de"
+        ]
       });
     } catch (e) {
-      console.warn("Puppeteer nicht verfügbar, Fallback auf statisches Fetch:", e.message);
+      console.warn("Playwright nicht verfügbar, Fallback auf statisches Fetch:", e.message);
       browserPromise = null;
     }
   }
@@ -22,7 +29,7 @@ async function getBrowser() {
 function looksLikeRenderedPage(html) {
   const h = String(html || "");
   if (h.trim().length < 1000) return false;
-  // Wenn keine Preise/Cent-Werte und kein `__NEXT_DATA__` mit Angebots-Marker, SPA-Verdacht
+  // Wenn keine Preise/Cent-Werte enthalten -> Verdacht auf SPA / nicht gerendert
   const hasPriceHint = /€|EUR|\d[.,]\d{2}/.test(h);
   const hasBotPage = /just a moment|cf-browser-verification|access denied|captcha/i.test(h);
   return hasPriceHint && !hasBotPage;
@@ -181,34 +188,91 @@ function isValidHttpUrl(value) {
 async function renderWithBrowser(url) {
   const browser = await getBrowser();
   if (!browser) return null;
-  let page;
+
+  // Neuer isolierter Browser-Context mit realistischem Fingerprint (bessere SPA-/Bot-Umgehung)
+  let context;
   try {
-    page = await browser.newPage();
-    // Nur EIN page.goto mit sofortiger Auflösung (domcontentloaded), dann festes Warten.
-    // Dies vermeidet, dass networkidle2 bei SPAs (WebSockets etc.) nie erreicht wird.
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 }).catch(() => {});
-    await sleep(8000);
+    context = await browser.newContext({
+      locale: "de-DE",
+      timezoneId: "Europe/Berlin",
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      viewport: { width: 1366, height: 900 },
+      extraHTTPHeaders: {
+        "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7"
+      }
+    });
+
+    // Optional: nutzerähnliche Stealth-Extras
+    await context.addInitScript(() => {
+      // navigator.webdriver verbergen (reduziert Bot-Erkennung)
+      Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+    });
+
+    const page = await context.newPage();
+
+    // Einzelner goto mit 'load' + hartem Timeout via Promise.race (verhindert Hängen)
+    await Promise.race([
+      page.goto(url, { waitUntil: "load", timeout: 25000 }).catch(() => {}),
+      new Promise((r) => setTimeout(r, 25000))
+    ]);
+
+    // Warten, bis SPA-Inhalte nachgeladen sind (Netzwerk ruht für 1,2s)
+    await page.waitForLoadState("networkidle", { timeout: 20000 }).catch(() => {});
+    await sleep(2000);
+
+    // Cookie- / Consent-Banner aktiv schließen (verdeckt oft die eigentlichen Angebote)
+    await dismissConsentBanner(page);
+
     // Scrollen simuliert echte Nutzer-Interaktion und triggert Lazy-Loading
-    await autoScroll(page, 10);
+    await autoScroll(page, 14);
+
     const html = await page.content();
     return html;
   } catch (e) {
     console.warn(`Browser-Rendering fehlgeschlagen für ${url}:`, e.message);
     return null;
   } finally {
-    if (page) await page.close().catch(() => {});
+    if (context) await context.close().catch(() => {});
   }
 }
 
 async function autoScroll(page, steps = 8) {
   try {
-    await page.evaluate(async (n) => {
-      for (let i = 0; i < n; i++) {
-        window.scrollBy(0, window.innerHeight * 0.8);
-        await new Promise((r) => setTimeout(r, 600));
-      }
-    }, steps);
+    for (let i = 0; i < steps; i++) {
+      await page.mouse.wheel(0, 900).catch(() => {});
+      await page.evaluate(() => window.scrollBy(0, window.innerHeight * 0.8)).catch(() => {});
+      await sleep(600);
+    }
   } catch { /* ignore scroll errors */ }
+}
+
+// Schließt typische Cookie-/Consent-Banner der deutschen Markt-Websites
+async function dismissConsentBanner(page) {
+  const selectors = [
+    // ALDI (Usercentrics), REWE (OneTrust), EDEKA, LIDL gängige Labels/Schaltflächen
+    "button:has-text('Alle akzeptieren')",
+    "button:has-text('Zustimmen')",
+    "button:has-text('Akzeptieren')",
+    "button:has-text('Accept all')",
+    "button:has-text('Alle erlauben')",
+    "button:has-text('Einverstanden')",
+    "#onetrust-accept-btn-handler",
+    "button[id*='accept' i]",
+    "button[id*='consent' i]",
+    "[data-testid*='accept' i]",
+    "[class*='accept-all']"
+  ];
+  for (const sel of selectors) {
+    try {
+      const btn = page.locator(sel).first();
+      if (await btn.isVisible({ timeout: 1500 }).catch(() => false)) {
+        await btn.click({ timeout: 3000 }).catch(() => {});
+        await sleep(1200);
+        break; // Ein Consent reicht meist
+      }
+    } catch { /* selector nicht vorhanden */ }
+  }
 }
 
 function sleep(ms) {
