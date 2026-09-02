@@ -71,6 +71,7 @@ export function AppProvider({ children }) {
       accent: "#ef8354",
       bgTop: "#f9f3e7",
       bgBottom: "#e2f3ff",
+      card: "#ffffffcc",
       darkMode: false
     };
   });
@@ -118,6 +119,7 @@ export function AppProvider({ children }) {
       root.style.setProperty("--bg-bottom", theme.bgBottom);
       root.style.setProperty("--brand", theme.primary);
       root.style.setProperty("--accent", theme.accent);
+      root.style.setProperty("--card", theme.card);
 
       // Apply dark mode class
       if (theme.darkMode) {
@@ -141,6 +143,7 @@ export function AppProvider({ children }) {
       accent: "#ef8354",
       bgTop: "#f9f3e7",
       bgBottom: "#e2f3ff",
+      card: "#ffffffcc",
       darkMode: false
     });
   };

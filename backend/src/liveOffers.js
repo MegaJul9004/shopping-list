@@ -1,5 +1,6 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
+import { getAldiOffers, getEdekaOffers, getReweOffers, getLidlOffers } from "./marketApis.js";
 
 // Lazy Playwright-Import (wird erst beim ersten Browser-Rendering geladen)
 let browserPromise = null;
@@ -488,6 +489,20 @@ async function fetchLiveOffersForMarket(market, sourceUrl, weekOffset) {
     return { offers: [], available: false, reason: "Angebote der nächsten Woche sind noch nicht verfügbar" };
   }
 
+  // ---- JSON-first: strukturierte Markt-APIs nutzen, falls verfügbar (schnell & robust) ----
+  const jsonConnector = getJsonConnector(market);
+  if (jsonConnector && weekOffset === 0) {
+    try {
+      // Konfigurierte Markt-/Filial-URL an den Connector durchreichen (falls dieser sie nutzt)
+      const result = await jsonConnector({ url: pageUrl });
+      if (result?.offers && result.offers.length > 0) {
+        return { market, ...result };
+      }
+    } catch (e) {
+      console.warn(`JSON-Connector ${market} fehlgeschlagen, Fallback auf HTML-Scraping:`, e.message);
+    }
+  }
+
   // Marktspezifische Selektoren, die zusätzlich zum generischen Ansatz geprüft werden
   const EXTRA_SELECTORS = {
     REWE: [".it-gallery-tile a, .sale-header a, .teaser-teaser a, [data-testid='product-tile'] a"],
@@ -538,6 +553,22 @@ async function fetchLiveOffersForMarket(market, sourceUrl, weekOffset) {
   }
 
   return { offers: generic, available: true, pageUrl };
+}
+
+/** Liefert den passenden JSON-Connector für einen Markt (oder null, wenn keiner verfügbar ist). */
+function getJsonConnector(market) {
+  switch (String(market || "").toUpperCase()) {
+    case "ALDI":
+      return getAldiOffers;
+    case "LIDL":
+      return getLidlOffers;
+    case "EDEKA":
+      return getEdekaOffers;
+    case "REWE":
+      return getReweOffers;
+    default:
+      return null;
+  }
 }
 
 export function getSupportedMarkets() {

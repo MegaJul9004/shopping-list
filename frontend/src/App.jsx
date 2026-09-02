@@ -30,7 +30,9 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState("");
   const [items, setItems] = useState([]);
   const [itemName, setItemName] = useState("");
-  const [itemQty, setItemQty] = useState(1);
+  // Mengenfeld als String halten, damit man beim Tippen nicht aus dem Feld fliegt;
+  // Validierung passiert erst in addItem().
+  const [itemQty, setItemQty] = useState("1");
   const [recipeQuery, setRecipeQuery] = useState("");
   const [recipes, setRecipes] = useState([]);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
@@ -133,9 +135,10 @@ export default function App() {
 
   const addItem = async () => {
     if (!itemName.trim() || !session) return;
+    const quantity = Math.max(1, Number(itemQty) || 1);
     try {
-      await api(`/families/${session.familyId}/items`, { method: "POST", body: JSON.stringify({ name: itemName.trim(), quantity: itemQty }) }, session.token);
-      setItemName(""); setItemQty(1);
+      await api(`/families/${session.familyId}/items`, { method: "POST", body: JSON.stringify({ name: itemName.trim(), quantity }) }, session.token);
+      setItemName(""); setItemQty("1");
     } catch (e) { setError(e.message); }
   };
 
@@ -289,8 +292,8 @@ export default function App() {
         <Link to="/settings">Einstellungen</Link>
       </div>
       <div className="add-form">
-        <input type="text" placeholder="Artikel eingeben" value={itemName} onChange={(e) => setItemName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addItem()} />
-        <input type="number" min={1} value={itemQty} onChange={(e) => setItemQty(Math.max(1, Number(e.target.value)))} />
+        <input type="text" placeholder="Artikel eingeben" value={itemName} onChange={(e) => setItemName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addItem(); } }} />
+        <input type="number" min={1} value={itemQty} onChange={(e) => setItemQty(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addItem(); } }} />
         <button type="button" onClick={addItem}>Hinzufügen</button>
       </div>
       <ul className="list">
@@ -302,7 +305,7 @@ export default function App() {
               <span className="item-qty">{item.quantity}x</span>
             </label>
             <div className="item-actions">
-              <button className="ghost" onClick={() => { setItemName(item.name); setItemQty(item.quantity); deleteItem(item.id); }}>Bearbeiten</button>
+              <button className="ghost" onClick={() => { setItemName(item.name); setItemQty(String(item.quantity)); deleteItem(item.id); }}>Bearbeiten</button>
               <button className="danger" onClick={() => deleteItem(item.id)}>Löschen</button>
             </div>
           </li>

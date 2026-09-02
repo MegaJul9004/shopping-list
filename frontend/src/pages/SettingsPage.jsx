@@ -4,10 +4,10 @@ import { useApp, api } from "../context/AppContext";
 import NavBar from "../components/NavBar";
 
 const THEME_PRESETS = [
-  { name: "Standard", primary: "#0d6e6e", accent: "#ef8354", bgTop: "#f9f3e7", bgBottom: "#e2f3ff" },
-  { name: "Dunkel", primary: "#1a1a2e", accent: "#e94560", bgTop: "#16213e", bgBottom: "#0f3460" },
-  { name: "Natur", primary: "#2d6a4f", accent: "#d4a373", bgTop: "#fefae0", bgBottom: "#e9edc9" },
-  { name: "Blau", primary: "#1e3a5f", accent: "#f4a261", bgTop: "#e8f4f8", bgBottom: "#b8d4e3" }
+  { name: "Standard", primary: "#0d6e6e", accent: "#ef8354", bgTop: "#f9f3e7", bgBottom: "#e2f3ff", card: "#ffffffcc" },
+  { name: "Dunkel", primary: "#1a1a2e", accent: "#e94560", bgTop: "#16213e", bgBottom: "#0f3460", card: "#1f2a37cc" },
+  { name: "Natur", primary: "#2d6a4f", accent: "#d4a373", bgTop: "#fefae0", bgBottom: "#e9edc9", card: "#ffffffcc" },
+  { name: "Blau", primary: "#1e3a5f", accent: "#f4a261", bgTop: "#e8f4f8", bgBottom: "#b8d4e3", card: "#ffffffcc" }
 ];
 
 const MARKETS = ["LIDL", "EDEKA", "ALDI", "REWE"];
@@ -155,6 +155,8 @@ export default function SettingsPage() {
                   onChange={(e) => updateTheme({ bgTop: e.target.value })} /></label>
                 <label>Hintergrund unten <input type="color" value={theme.bgBottom}
                   onChange={(e) => updateTheme({ bgBottom: e.target.value })} /></label>
+                <label>Kacheln <input type="color" value={theme.card}
+                  onChange={(e) => updateTheme({ card: e.target.value })} /></label>
               </div>
               <button type="button" className="ghost" onClick={resetTheme}>Zurücksetzen</button>
             </div>
