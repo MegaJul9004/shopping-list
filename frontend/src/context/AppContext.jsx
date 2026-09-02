@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import translations from "../i18n/translations";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 const EDITOR_STORAGE_KEY = "shopping_editor_mode";
@@ -60,7 +61,15 @@ export function AppProvider({ children }) {
   // App Settings State
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem("shopping_settings");
-    return saved ? JSON.parse(saved) : { duplicateBehavior: "merge", language: "de" };
+    return saved ? JSON.parse(saved) : {
+      duplicateBehavior: "merge",
+      language: "de",
+      units: "metric",
+      dateFormat: "DD.MM.YYYY",
+      currency: "EUR",
+      numberFormat: "comma",
+      weekStart: 1
+    };
   });
 
   // Theme State (with dark mode toggle)
@@ -163,6 +172,35 @@ export function AppProvider({ children }) {
     setSettings(prev => ({ ...prev, ...newSettings }));
   };
 
+  // Übersetzungs-Helfer: t("nav.home") mit deutschen Fallback
+  const lang = (settings?.language && translations[settings.language]) ? settings.language : "de";
+  const t = useCallback((key, vars = {}) => {
+    const table = translations[lang] || translations.de;
+    let str = table[key] ?? translations.de[key] ?? key;
+    if (vars && typeof str === "string") {
+      for (const [k, v] of Object.entries(vars)) {
+        str = str.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
+      }
+    }
+    return str;
+  }, [lang]);
+
+  // Sprachabhängige Wochentagsnamen (weekStart: 1 = Montag, 0 = Sonntag)
+  const DAY_NAMES = {
+    de: ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"],
+    en: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+    es: ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"],
+    fr: ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"]
+  }[lang] || translations.de;
+
+  // Hilfsfunktion: Tag-Namen in passender Reihenfolge (ab weekStart)
+  const getDayNames = useCallback(() => {
+    const weekStart = Number(settings.weekStart ?? 1);
+    const base = DAY_NAMES;
+    const reordered = base.slice(weekStart).concat(base.slice(0, weekStart));
+    return reordered;
+  }, [lang, settings.weekStart]);
+
   // Context value with all states and functions
   const contextValue = {
     session,
@@ -174,7 +212,9 @@ export function AppProvider({ children }) {
     resetTheme,
     toggleDarkMode,
     editorMode,
-    setEditorMode
+    setEditorMode,
+    t,
+    getDayNames
   };
 
   return (

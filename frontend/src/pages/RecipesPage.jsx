@@ -1,0 +1,230 @@
+import { useEffect, useState } from "react";
+import { useApp, api } from "../context/AppContext";
+
+/** Skaliert eine Menge um einen Faktor (Integer, Bruch oder Zahl+Einheit). */
+function scaleAmount(line, factor) {
+  const m = String(line || "").match(/^([\d.,/]+)\s*(.*)$/);
+  if (!m) return line;
+  const numText = m[1];
+  const unit = m[2];
+  let value;
+  if (numText.includes("/")) {
+    const [a, b] = numText.split("/");
+    value = (Number(a.replace(",", ".")) || 0) / (Number(b.replace(",", ".")) || 1);
+  } else {
+    value = Number(numText.replace(",", ".")) || 0;
+  }
+  const scaled = value * factor;
+  const rounded = Math.round(scaled * 100) / 100;
+  return `${formatNum(rounded)}${unit ? " " + unit : ""}`;
+}
+
+function formatNum(n) {
+  const s = Math.round(n * 1000) / 1000;
+  return Number.isInteger(s) ? String(s) : (Math.round(s * 100) / 100).toString().replace(".", ",");
+}
+
+export default function RecipesPage() {
+  const { session, settings, t } = useApp();
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [detail, setDetail] = useState(null);
+  const [saved, setSaved] = useState([]);
+  const [error, setError] = useState("");
+  const [displayOn, setDisplayOn] = useState({});
+
+  const fam = session?.familyId;
+
+  useEffect(() => {
+    if (!fam) return;
+    api(`/families/${fam}/recipes`, {}, session.token)
+      .then((d) => setSaved(d.recipes || []))
+      .catch(() => {});
+  }, [fam, session]);
+
+  const search = async () => {
+    if (!q.trim()) return;
+    setSearching(true); setError("");
+    try {
+      const d = await api(`/recipes/search?q=${encodeURIComponent(q.trim())}`);
+      setResults(d.recipes || []);
+    } catch (e) { setError(e.message); }
+    setSearching(false);
+  };
+
+  const openDetail = async (recipe) => {
+    setError("");
+    try {
+      const d = await api(`/recipes/detail?url=${encodeURIComponent(recipe.url)}`);
+      setDetail({ ...d, url: recipe.url });
+    } catch (e) { setError(e.message); }
+  };
+
+  const saveRecipe = async () => {
+    if (!detail || !fam) return;
+    try {
+      const d = await api(`/families/${fam}/recipes`, {
+        method: "POST",
+        body: JSON.stringify({ title: detail.title, image: detail.image, url: detail.url, servings: detail.servings, ingredients: detail.ingredients, instructions: detail.instructions })
+      }, session.token);
+      setSaved((prev) => [d.recipe, ...prev]);
+    } catch (e) { setError(e.message); }
+  };
+
+  const updateSaved = async (id, patch) => {
+    try {
+      const d = await api(`/families/${fam}/recipes/${id}`, {
+        method: "PATCH", body: JSON.stringify(patch)
+      }, session.token);
+      setSaved((prev) => prev.map((r) => (r.id === id ? d.recipe : r)));
+    } catch (e) { setError(e.message); }
+  };
+
+  const deleteSaved = async (id) => {
+    try {
+      await api(`/families/${fam}/recipes/${id}`, { method: "DELETE" }, session.token);
+      setSaved((prev) => prev.filter((r) => r.id !== id));
+    } catch (e) { setError(e.message); }
+  };
+
+  const renameRecipe = (r) => {
+    const name = prompt("Neuen Namen eingeben:", r.title);
+    if (name && name.trim()) updateSaved(r.id, { title: name.trim() });
+  };
+
+  const addIngredient = (r) => {
+    const name = prompt("Zutat hinzufügen:", "");
+    if (name && name.trim()) updateSaved(r.id, { ingredients: [...r.ingredients, name.trim()] });
+  };
+
+  const removeIngredient = (r, idx) => {
+    updateSaved(r.id, { ingredients: r.ingredients.filter((_, i) => i !== idx) });
+  };
+
+  const setServings = (r, n) => {
+    const replaced = { ...r, targetServings: Math.max(1, Number(n) || 1) };
+    // Live im lokalen State speichern (für die Skalierung im UI)
+    setSaved((prev) => prev.map((r2) => (r2.id === r.id ? replaced : r2)));
+    updateSaved(r.id, { servings: Math.max(1, Number(n) || 1) });
+  };
+
+  const scaledIngredients = (r, n) => {
+    const target = Number(n) || Number(r.servings) || 4;
+    const base = Number(r.servings) || 4;
+    const factor = target / base;
+    return (r.ingredients || []).map((ing) => ({ original: ing, scaled: scaleAmount(ing, factor) }));
+  };
+
+  const addToShopping = async (r, n) => {
+    if (!fam) return;
+    const target = Number(n) || Number(r.servings) || 4;
+    const base = Number(r.servings) || 4;
+    const factor = target / base;
+    for (const ing of r.ingredients) {
+      const scaled = scaleAmount(ing, factor);
+      try {
+        await api(`/families/${fam}/items`, { method: "POST", body: JSON.stringify({ name: scaled, quantity: 1 }) }, session.token);
+      } catch (e) { setError(e.message); }
+    }
+  };
+
+  const addToRecurring = async (r) => {
+    if (!fam) return;
+    for (const ing of r.ingredients) {
+      try {
+        await api(`/families/${fam}/recurring`, { method: "POST", body: JSON.stringify({ name: ing, quantity: 1, dayOfWeek: 1 }) }, session.token);
+      } catch (e) { setError(e.message); }
+    }
+  };
+
+  return (
+    <div className="page-shell">
+      <header className="hero">
+        <p className="eyebrow">Chefkoch · Rezepte</p>
+        <h1>🍳 {t("nav.recipes")}</h1>
+        <p className="muted" style={{ color: "#cde3e3" }}>Rezepte suchen, speichern und in die Einkaufsliste übernehmen.</p>
+      </header>
+
+      {error && <div className="error-banner">{error}</div>}
+
+      <div className="dashboard-grid" style={{ marginTop: "1.4rem" }}>
+        <section className="card">
+          <h2>🔍 Suche</h2>
+          <div className="recipe-form">
+            <input type="text" placeholder="Suchbegriff (z.B. Nudeln)" value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && search()} />
+            <button type="button" onClick={search} disabled={searching}>{searching ? "..." : "Suchen"}</button>
+          </div>
+          {results.length > 0 && (
+            <ul className="list" style={{ marginTop: "0.8rem" }}>
+              {results.map((r, i) => (
+                <li key={i}>
+                  <button type="button" className="ghost" style={{ textAlign: "left" }} onClick={() => openDetail(r)}>👁️ {r.title}</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {detail && (
+          <section className="card">
+            <h2>{detail.title}</h2>
+            {detail.image && <img src={detail.image} alt={detail.title} style={{ width: "100%", maxHeight: "260px", objectFit: "cover", borderRadius: "10px" }} />}
+            <p className="muted">Portionen: {detail.servings} · Zutaten: {detail.ingredients.length}</p>
+            <button type="button" onClick={saveRecipe}>💾 Speichern</button>
+          </section>
+        )}
+      </div>
+
+      <div className="dashboard-grid" style={{ marginTop: "1.4rem" }}>
+        <section className="card" style={{ gridColumn: "1 / -1" }}>
+          <h2>📚 Gespeicherte Rezepte</h2>
+          {saved.length === 0 && <p className="muted">Noch keine Rezepte gespeichert.</p>}
+          <div style={{ display: "grid", gap: "0.7rem" }}>
+            {saved.map((r) => {
+              const on = displayOn[r.id];
+              const target = r.targetServings || r.servings;
+              return (
+                <div key={r.id} className="list" style={{ padding: "0.9rem", border: "1px solid #d8e3ea", borderRadius: "12px", display: "grid", gap: "0.5rem" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.4rem" }}>
+                    <strong>{r.title}</strong>
+                    <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                      <button type="button" className="ghost" onClick={() => renameRecipe(r)}>✏️</button>
+                      <button type="button" className="ghost" onClick={() => addIngredient(r)}>+ Zutat</button>
+                      <button type="button" className="danger" onClick={() => deleteSaved(r.id)}>🗑️</button>
+                    </div>
+                  </div>
+                  {r.image && <img src={r.image} alt={r.title} style={{ width: "100%", maxHeight: "180px", objectFit: "cover", borderRadius: "10px" }} />}
+                  <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.9rem", flexWrap: "wrap" }}>
+                    Portionen:
+                    <input type="number" min={1} value={target} style={{ width: "80px" }}
+                      onChange={(e) => setServings(r, e.target.value)} />
+                    <button type="button" className="ghost" onClick={() => setDisplayOn((p) => ({ ...p, [r.id]: !on }))}>
+                      {on ? "Display aus" : "Display an"}
+                    </button>
+                  </label>
+                  {on && (
+                    <ul className="list">
+                      {scaledIngredients(r, target).map((it, idx) => (
+                        <li key={idx} style={{ alignItems: "center", gap: "0.4rem" }}>
+                          <span>{it.scaled}</span>
+                          <button type="button" className="danger" onClick={() => removeIngredient(r, idx)}>✕</button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                    <button type="button" onClick={() => addToShopping(r, target)}>🛒 Zur Einkaufsliste</button>
+                    <button type="button" className="ghost" onClick={() => addToRecurring(r)}>🔄 Wiederkehrend</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}

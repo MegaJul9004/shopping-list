@@ -22,7 +22,7 @@ const CARD_FONTS = [
 ];
 
 export default function SettingsPage() {
-  const { session, settings, updateSettings, theme, updateTheme, resetTheme } = useApp();
+  const { session, settings, updateSettings, theme, updateTheme, resetTheme, t } = useApp();
   const [showTheme, setShowTheme] = useState(false);
   const [saving, setSaving] = useState(false);
   const [branches, setBranches] = useState({});
@@ -177,6 +177,57 @@ export default function SettingsPage() {
               <button type="button" className="ghost" onClick={resetTheme}>Zurücksetzen</button>
             </div>
           )}
+        </section>
+
+        <section className="card">
+          <h2>🌐 {t("settings.language")}</h2>
+          <div className="settings-field">
+            <label>{t("nav.login") === "Se connecter" ? "Langue" : t("nav.home") === "Inicio" ? "Idioma" : t("nav.home") === "Home" ? "Language" : "Sprache"}</label>
+            <select value={settings.language} onChange={(e) => updateSettings({ language: e.target.value })}>
+              <option value="de">Deutsch</option>
+              <option value="en">English</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+            </select>
+          </div>
+          <div className="settings-field">
+            <label>{t("settings.units")}</label>
+            <select value={settings.units} onChange={(e) => updateSettings({ units: e.target.value })}>
+              <option value="metric">{t("settings.units.metric")}</option>
+              <option value="imperial">{t("settings.units.imperial")}</option>
+            </select>
+          </div>
+          <div className="settings-field">
+            <label>Datumsformat</label>
+            <select value={settings.dateFormat} onChange={(e) => updateSettings({ dateFormat: e.target.value })}>
+              <option value="DD.MM.YYYY">TT.MM.JJJJ (31.12.2026)</option>
+              <option value="MM/DD/YYYY">MM/TT/JJJJ (12/31/2026)</option>
+              <option value="YYYY-MM-DD">JJJJ-MM-TT (2026-12-31)</option>
+            </select>
+          </div>
+          <div className="settings-field">
+            <label>Währung</label>
+            <select value={settings.currency} onChange={(e) => updateSettings({ currency: e.target.value })}>
+              <option value="EUR">€ Euro</option>
+              <option value="USD">$ US-Dollar</option>
+              <option value="GBP">£ Britisches Pfund</option>
+            </select>
+          </div>
+          <div className="settings-field">
+            <label>Zahlformat</label>
+            <select value={settings.numberFormat} onChange={(e) => updateSettings({ numberFormat: e.target.value })}>
+              <option value="comma">Komma (1,50)</option>
+              <option value="dot">Punkt (1.50)</option>
+            </select>
+          </div>
+          <div className="settings-field">
+            <label>Wochenstart</label>
+            <select value={settings.weekStart} onChange={(e) => updateSettings({ weekStart: Number(e.target.value) })}>
+              <option value={1}>Montag</option>
+              <option value={0}>Sonntag</option>
+            </select>
+          </div>
+          <p className="muted" style={{ marginTop: "0.6rem" }}>Änderungen werden automatisch gespeichert und angewendet.</p>
         </section>
 
         <section className="card">

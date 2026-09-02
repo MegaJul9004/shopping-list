@@ -17,7 +17,8 @@ function defaultStore() {
     familyLocations: [],
     familySettings: [],
     miniLists: [],
-    offerWatchlist: []
+    offerWatchlist: [],
+    savedRecipes: []
   };
 }
 
@@ -43,7 +44,8 @@ function loadStore() {
       familyLocations: Array.isArray(parsed.familyLocations) ? parsed.familyLocations : [],
       familySettings: Array.isArray(parsed.familySettings) ? parsed.familySettings : [],
       miniLists: Array.isArray(parsed.miniLists) ? parsed.miniLists : [],
-      offerWatchlist: Array.isArray(parsed.offerWatchlist) ? parsed.offerWatchlist : []
+      offerWatchlist: Array.isArray(parsed.offerWatchlist) ? parsed.offerWatchlist : [],
+      savedRecipes: Array.isArray(parsed.savedRecipes) ? parsed.savedRecipes : []
     };
   } catch {
     return defaultStore();
@@ -352,6 +354,62 @@ export function deleteMiniList({ listId, familyId }) {
     (ml) => !(ml.id === listId && ml.familyId === familyId)
   );
   const changed = store.miniLists.length < before;
+  if (changed) persist();
+  return changed;
+}
+
+// ── Gespeicherte Rezepte ─────────────────────────────────────────────
+export function getSavedRecipes(familyId) {
+  return store.savedRecipes
+    .filter((r) => r.familyId === familyId)
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
+}
+
+export function getSavedRecipe({ recipeId, familyId }) {
+  return store.savedRecipes.find((r) => r.id === recipeId && r.familyId === familyId) || null;
+}
+
+export function addSavedRecipe({ id, familyId, title, image, url, servings, ingredients, instructions, source }) {
+  const now = new Date().toISOString();
+  store.savedRecipes.push({
+    id,
+    familyId,
+    title,
+    image: image || null,
+    url: url || null,
+    servings: Number(servings) || 4,
+    ingredients: Array.isArray(ingredients) ? ingredients : [],
+    instructions: Array.isArray(instructions) ? instructions : [],
+    source: source || "chefkoch",
+    createdAt: now,
+    updatedAt: now
+  });
+  persist();
+  return store.savedRecipes[store.savedRecipes.length - 1];
+}
+
+export function updateSavedRecipe({ recipeId, familyId, title, image, servings, ingredients, instructions }) {
+  const index = store.savedRecipes.findIndex((r) => r.id === recipeId && r.familyId === familyId);
+  if (index < 0) return null;
+  const r = store.savedRecipes[index];
+  const next = {
+    ...r,
+    title: title ?? r.title,
+    image: image ?? r.image,
+    servings: servings != null ? Number(servings) : r.servings,
+    ingredients: Array.isArray(ingredients) ? ingredients : r.ingredients,
+    instructions: Array.isArray(instructions) ? instructions : r.instructions,
+    updatedAt: new Date().toISOString()
+  };
+  store.savedRecipes[index] = next;
+  persist();
+  return next;
+}
+
+export function deleteSavedRecipe({ recipeId, familyId }) {
+  const before = store.savedRecipes.length;
+  store.savedRecipes = store.savedRecipes.filter((r) => !(r.id === recipeId && r.familyId === familyId));
+  const changed = store.savedRecipes.length < before;
   if (changed) persist();
   return changed;
 }

@@ -32,7 +32,12 @@ import {
   setFamilySettings,
   smartAddItem,
   updateItem,
-  searchBranchesByZip
+  searchBranchesByZip,
+  getSavedRecipes,
+  getSavedRecipe,
+  addSavedRecipe,
+  updateSavedRecipe,
+  deleteSavedRecipe
 } from "./db.js";
 import { buildExportByMarket, compareMarkets } from "./offers.js";
 import {
@@ -41,7 +46,7 @@ import {
   getMarketOffers,
   getLiveOffers
 } from "./liveOffers.js";
-import { searchChefkoch } from "./recipeSearch.js";
+import { searchChefkoch, getRecipeDetail } from "./recipeSearch.js";
 
 const familyCode = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 6);
 const jwtSecret = process.env.JWT_SECRET || "dev-secret-change-me-in-production";
@@ -603,6 +608,77 @@ app.get("/api/recipes/by-ingredients", async (req, res) => {
       detail: error instanceof Error ? error.message : "Unknown error"
     });
   }
+});
+
+// Chefkoch-Detailseite eines Rezepts abrufen (Zutaten, Portionen, Schritte)
+app.get("/api/recipes/detail", async (req, res) => {
+  const url = String(req.query.url || "");
+  if (!url) return res.status(400).json({ error: "url is required" });
+  try {
+    const detail = await getRecipeDetail(url);
+    if (!detail) return res.status(502).json({ error: "Could not load recipe" });
+    return res.json(detail);
+  } catch (error) {
+    return res.status(502).json({
+      error: "Unable to fetch recipe detail",
+      detail: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+// ── Gespeicherte Rezepte (auth) ────────────────────────────────────────
+app.get("/api/families/:familyId/recipes", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  return res.json({ recipes: getSavedRecipes(familyId) });
+});
+
+app.post("/api/families/:familyId/recipes", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const { title, image, url, servings, ingredients, instructions, source } = req.body || {};
+  if (!title || !Array.isArray(ingredients)) {
+    return res.status(400).json({ error: "title and ingredients[] are required" });
+  }
+  const recipe = addSavedRecipe({
+    id: nanoid(10),
+    familyId,
+    title,
+    image,
+    url,
+    servings,
+    ingredients,
+    instructions: Array.isArray(instructions) ? instructions : [],
+    source
+  });
+  return res.status(201).json({ recipe });
+});
+
+app.patch("/api/families/:familyId/recipes/:recipeId", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  const recipeId = String(req.params.recipeId || "");
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const { title, image, servings, ingredients, instructions } = req.body || {};
+  const updated = updateSavedRecipe({ recipeId, familyId, title, image, servings, ingredients, instructions });
+  if (!updated) return res.status(404).json({ error: "Recipe not found" });
+  return res.json({ recipe: updated });
+});
+
+app.delete("/api/families/:familyId/recipes/:recipeId", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  const recipeId = String(req.params.recipeId || "");
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const deleted = deleteSavedRecipe({ recipeId, familyId });
+  if (!deleted) return res.status(404).json({ error: "Recipe not found" });
+  return res.json({ ok: true });
 });
 
 app.get("/api/offers/markets", (_req, res) => {

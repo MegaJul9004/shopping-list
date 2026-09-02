@@ -488,6 +488,22 @@ h3 {
   cursor: pointer;
 }
 
+.settings-field {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.8rem;
+}
+
+.settings-field label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.settings-field select,
+.settings-field input {
+  width: 100%;
+}
+
 /* ── Recipe Filters ────────────────────────────────────────────────── */
 
 .recipe-filters {
