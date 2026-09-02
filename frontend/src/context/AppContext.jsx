@@ -72,6 +72,8 @@ export function AppProvider({ children }) {
       bgTop: "#f9f3e7",
       bgBottom: "#e2f3ff",
       card: "#ffffffcc",
+      cardText: "#1f2a37",
+      cardFont: "\"Space Grotesk\", sans-serif",
       darkMode: false
     };
   });
@@ -120,6 +122,8 @@ export function AppProvider({ children }) {
       root.style.setProperty("--brand", theme.primary);
       root.style.setProperty("--accent", theme.accent);
       root.style.setProperty("--card", theme.card);
+      root.style.setProperty("--card-text", theme.cardText);
+      root.style.setProperty("--card-font", theme.cardFont);
 
       // Apply dark mode class
       if (theme.darkMode) {
@@ -144,6 +148,8 @@ export function AppProvider({ children }) {
       bgTop: "#f9f3e7",
       bgBottom: "#e2f3ff",
       card: "#ffffffcc",
+      cardText: "#1f2a37",
+      cardFont: "\"Space Grotesk\", sans-serif",
       darkMode: false
     });
   };

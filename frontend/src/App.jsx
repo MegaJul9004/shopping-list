@@ -17,6 +17,150 @@ const DEFAULT_CARD_ORDER = ["shopping", "minilists", "recurring", "recipes"];
 const CARD_STORAGE_KEY = "shopping_card_order";
 const EDITOR_STORAGE_KEY = "shopping_editor_mode";
 
+// ── Karten als stabile Top-Level-Komponenten ─────────────────────────────
+// Wichtig: Innerhalb von App() definierte Komponenten bekommen bei jedem
+// Re-Render eine NEUE Identität -> React würde sie unmounten/remounten,
+// wodurch der Cursor aus Eingabefeldern fliegt. Deshalb leben sie hier
+// außerhalb und erhalten ihre Daten über das `p`-Props-Objekt.
+
+function CardShopping(p) {
+  return (
+    <section className="card" data-card-id="shopping">
+      <div className="card-header-row">
+        <h2>Einkaufsliste</h2>
+        {p.editorMode && <span className="editor-card-badge">Position {p.cardOrder.indexOf("shopping") + 1}</span>}
+      </div>
+      <div className="family-chip">
+        <span className="muted">Menge erhöhen: {p.settings.duplicateBehavior === "merge" ? "\u2705 An" : "\u274c Aus"}</span>
+        <Link to="/settings">Einstellungen</Link>
+      </div>
+      <div className="add-form">
+        <input type="text" placeholder="Artikel eingeben" value={p.itemName} onChange={(e) => p.setItemName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); p.addItem(); } }} />
+        <input type="number" min={1} value={p.itemQty} onChange={(e) => p.setItemQty(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); p.addItem(); } }} />
+        <button type="button" onClick={p.addItem}>Hinzufügen</button>
+      </div>
+      <ul className="list">
+        {p.items.map((item) => (
+          <li key={item.id} className={item.checked ? "checked" : ""}>
+            <label className="item-row">
+              <input type="checkbox" checked={item.checked} onChange={() => p.toggleItem(item.id, item.checked)} />
+              <span className="item-name">{item.name}</span>
+              <span className="item-qty">{item.quantity}x</span>
+            </label>
+            <div className="item-actions">
+              <button className="ghost" onClick={() => { p.setItemName(item.name); p.setItemQty(String(item.quantity)); p.deleteItem(item.id); }}>Bearbeiten</button>
+              <button className="danger" onClick={() => p.deleteItem(item.id)}>Löschen</button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function CardMiniLists(p) {
+  return (
+    <section className="card" data-card-id="minilists">
+      <div className="card-header-row">
+        <h2>📋 Mini-Listen</h2>
+        {p.editorMode && <span className="editor-card-badge">Position {p.cardOrder.indexOf("minilists") + 1}</span>}
+      </div>
+      <div className="add-form" style={{ gridTemplateColumns: "1fr auto" }}>
+        <input type="text" placeholder="Listenname" value={p.miniListName} onChange={(e) => p.setMiniListName(e.target.value)} />
+        <button type="button" onClick={() => p.setShowMiniListEditor(true)}>+ Neu</button>
+      </div>
+      {p.showMiniListEditor && (
+        <div className="mini-form">
+          <input type="text" placeholder="Zutat (Enter)" value={p.miniListItemInput} onChange={(e) => p.setMiniListItemInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && p.miniListItemInput.trim()) { p.setMiniListItems([...p.miniListItems, { name: p.miniListItemInput.trim(), quantity: 1 }]); p.setMiniListItemInput(""); } }} />
+          <ul className="recurring-list" style={{ margin: "0.4rem 0" }}>
+            {p.miniListItems.map((mi, idx) => (
+              <li key={idx}><span>{mi.name} ({mi.quantity}x)</span><button className="danger" onClick={() => p.setMiniListItems(p.miniListItems.filter((_, i) => i !== idx))}>✕</button></li>
+            ))}
+          </ul>
+          <div className="switch-row">
+            <button onClick={p.saveMiniList}>Speichern</button>
+            <button className="ghost" onClick={() => { p.setShowMiniListEditor(false); p.setMiniListItems([]); }}>Abbrechen</button>
+          </div>
+        </div>
+      )}
+      {p.miniLists.length > 0 && (
+        <ul className="recurring-list">
+          {p.miniLists.map((ml) => (
+            <li key={ml.id}>
+              <div><strong>{ml.name}</strong><p className="muted">{ml.items.length} Zutaten</p></div>
+              <div className="item-actions">
+                <button onClick={() => p.addMiniListToShopping(ml)}>+ Zur Liste</button>
+                <button className="danger" onClick={() => p.deleteMiniList(ml.id)}>✕</button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function CardRecurring(p) {
+  return (
+    <section className="card" data-card-id="recurring">
+      <div className="card-header-row">
+        <h2>🔄 Wiederkehrende Artikel</h2>
+        {p.editorMode && <span className="editor-card-badge">Position {p.cardOrder.indexOf("recurring") + 1}</span>}
+      </div>
+      <div className="recurring-form">
+        <input type="text" placeholder="Artikel" value={p.recurName} onChange={(e) => p.setRecurName(e.target.value)} />
+        <input type="number" min={1} value={p.recurQty} onChange={(e) => p.setRecurQty(Math.max(1, Number(e.target.value)))} />
+        <select value={p.recurDay} onChange={(e) => p.setRecurDay(Number(e.target.value))}>
+          {DAY_NAMES.map((name, idx) => <option key={idx} value={idx}>{name}</option>)}
+        </select>
+        <button type="button" onClick={p.addRecurring}>+ Hinzufügen</button>
+      </div>
+      {p.recurringItems.length > 0 && (
+        <ul className="recurring-list">
+          {p.recurringItems.map((ritem) => (
+            <li key={ritem.id}><span>{ritem.name} ({ritem.quantity}x) - <span className="muted">{DAY_NAMES[ritem.dayOfWeek]}</span></span><button className="danger" onClick={() => p.deleteRecurring(ritem.id)}>✕</button></li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function CardRecipes(p) {
+  return (
+    <section className="card" data-card-id="recipes">
+      <div className="card-header-row">
+        <h2>🍳 Rezepte finden</h2>
+        {p.editorMode && <span className="editor-card-badge">Position {p.cardOrder.indexOf("recipes") + 1}</span>}
+      </div>
+      <div className="recipe-form">
+        <input type="text" placeholder="Suchbegriff" value={p.recipeQuery} onChange={(e) => p.setRecipeQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && p.searchRecipes()} />
+        <button type="button" onClick={p.searchRecipes} disabled={p.loadingRecipes}>{p.loadingRecipes ? "Suche..." : "Suchen"}</button>
+      </div>
+      {p.recipes.length > 0 && (
+        <ul className="list">{p.recipes.map((r, i) => <li key={i}><a href={r.url} target="_blank" rel="noreferrer">{r.title}</a></li>)}</ul>
+      )}
+      <p className="muted" style={{ marginTop: "0.5rem" }}>Oder nach Zutaten:</p>
+      <div className="recipe-filters">
+        <input type="text" placeholder="Zutat (Enter)" value={p.ingredientInput} onChange={(e) => p.setIngredientInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && p.ingredientInput.trim()) { p.setSelectedIngredients([...p.selectedIngredients, p.ingredientInput.trim()]); p.setIngredientInput(""); } }} />
+        <button type="button" onClick={p.searchByIngredients} disabled={p.selectedIngredients.length === 0 || p.loadingRecipes}>{p.loadingRecipes ? "Suche..." : "Rezepte finden"}</button>
+      </div>
+      <div className="family-chip">
+        {p.selectedIngredients.map((ing, idx) => (
+          <span key={idx} className="tag">{ing}<button className="danger" onClick={() => p.setSelectedIngredients(p.selectedIngredients.filter((_, i) => i !== idx))}>✕</button></span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+const CARD_COMPONENTS = {
+  shopping: CardShopping,
+  minilists: CardMiniLists,
+  recurring: CardRecurring,
+  recipes: CardRecipes
+};
+
 export default function App() {
   const { session, setSession, settings, theme } = useApp();
 
@@ -256,6 +400,27 @@ export default function App() {
     setDragOverIdx(-1);
   };
 
+  // Props für die (Top-Level) Karten-Komponenten
+  const cardProps = {
+    editorMode,
+    cardOrder,
+    settings,
+    itemName, setItemName,
+    itemQty, setItemQty,
+    items, addItem, toggleItem, deleteItem,
+    miniLists, miniListName, setMiniListName,
+    showMiniListEditor, setShowMiniListEditor,
+    miniListItemInput, setMiniListItemInput,
+    miniListItems, setMiniListItems,
+    saveMiniList, deleteMiniList, addMiniListToShopping,
+    recurringItems, recurName, setRecurName,
+    recurQty, setRecurQty, recurDay, setRecurDay,
+    addRecurring, deleteRecurring,
+    recipes, recipeQuery, setRecipeQuery, searchRecipes,
+    loadingRecipes, ingredientInput, setIngredientInput,
+    selectedIngredients, setSelectedIngredients, searchByIngredients
+  };
+
   const renderAuth = () => (
     <section className="card">
       <h2>{registerMode === "create" ? "Neue Familie erstellen" : "Familie beitreten"}</h2>
@@ -404,13 +569,6 @@ export default function App() {
     </section>
   );
 
-  const CARD_COMPONENTS = {
-    shopping: CardShopping,
-    minilists: CardMiniLists,
-    recurring: CardRecurring,
-    recipes: CardRecipes
-  };
-
   return (
     <div>
       <nav className="navbar">
@@ -496,7 +654,7 @@ export default function App() {
                         <span className="editor-move-label">Verschieben</span>
                       </div>
                     )}
-                    <Comp />
+                    <Comp {...cardProps} />
                   </div>
                 );
               })}

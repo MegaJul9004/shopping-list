@@ -4,13 +4,22 @@ import { useApp, api } from "../context/AppContext";
 import NavBar from "../components/NavBar";
 
 const THEME_PRESETS = [
-  { name: "Standard", primary: "#0d6e6e", accent: "#ef8354", bgTop: "#f9f3e7", bgBottom: "#e2f3ff", card: "#ffffffcc" },
-  { name: "Dunkel", primary: "#1a1a2e", accent: "#e94560", bgTop: "#16213e", bgBottom: "#0f3460", card: "#1f2a37cc" },
-  { name: "Natur", primary: "#2d6a4f", accent: "#d4a373", bgTop: "#fefae0", bgBottom: "#e9edc9", card: "#ffffffcc" },
-  { name: "Blau", primary: "#1e3a5f", accent: "#f4a261", bgTop: "#e8f4f8", bgBottom: "#b8d4e3", card: "#ffffffcc" }
+  { name: "Standard", primary: "#0d6e6e", accent: "#ef8354", bgTop: "#f9f3e7", bgBottom: "#e2f3ff", card: "#ffffffcc", cardText: "#1f2a37", cardFont: '"Space Grotesk", sans-serif' },
+  { name: "Dunkel", primary: "#1a1a2e", accent: "#e94560", bgTop: "#16213e", bgBottom: "#0f3460", card: "#1f2a37cc", cardText: "#e8eef2", cardFont: '"Space Grotesk", sans-serif' },
+  { name: "Natur", primary: "#2d6a4f", accent: "#d4a373", bgTop: "#fefae0", bgBottom: "#e9edc9", card: "#ffffffcc", cardText: "#2b3427", cardFont: '"Space Grotesk", sans-serif' },
+  { name: "Blau", primary: "#1e3a5f", accent: "#f4a261", bgTop: "#e8f4f8", bgBottom: "#b8d4e3", card: "#ffffffcc", cardText: "#1c2b36", cardFont: '"Space Grotesk", sans-serif' }
 ];
 
 const MARKETS = ["LIDL", "EDEKA", "ALDI", "REWE"];
+
+const CARD_FONTS = [
+  { label: "Space Grotesk", value: '"Space Grotesk", sans-serif' },
+  { label: "Sora", value: '"Sora", sans-serif' },
+  { label: "Serif (Georgia)", value: 'Georgia, "Times New Roman", serif' },
+  { label: "Monospace (Courier)", value: '"Courier New", monospace' },
+  { label: "Sans (Arial)", value: "Arial, Helvetica, sans-serif" },
+  { label: "Comic (Comic Sans)", value: '"Comic Sans MS", "Segoe UI", cursive' }
+];
 
 export default function SettingsPage() {
   const { session, settings, updateSettings, theme, updateTheme, resetTheme } = useApp();
@@ -157,6 +166,13 @@ export default function SettingsPage() {
                   onChange={(e) => updateTheme({ bgBottom: e.target.value })} /></label>
                 <label>Kacheln <input type="color" value={theme.card}
                   onChange={(e) => updateTheme({ card: e.target.value })} /></label>
+                <label>Kachel-Schrift <input type="color" value={theme.cardText}
+                  onChange={(e) => updateTheme({ cardText: e.target.value })} /></label>
+                <label>Schriftart
+                  <select value={theme.cardFont} onChange={(e) => updateTheme({ cardFont: e.target.value })}>
+                    {CARD_FONTS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                  </select>
+                </label>
               </div>
               <button type="button" className="ghost" onClick={resetTheme}>Zurücksetzen</button>
             </div>

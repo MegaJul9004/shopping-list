@@ -2,6 +2,10 @@
   --bg-top: #f9f3e7;
   --bg-bottom: #e2f3ff;
   --card: #ffffffcc;
+  --card-text: #1f2a37;
+  --card-font: "Space Grotesk", sans-serif;
+  /* Innenbereiche (Inputs, Listen, Zellen) folgen der Kachel-Farbe, leicht abgedunkelt */
+  --card-inner: color-mix(in srgb, var(--card) 82%, #000 18%);
   --ink: #1f2a37;
   --brand: #0d6e6e;
   --accent: #ef8354;
@@ -95,6 +99,8 @@ body {
 .card {
   border-radius: var(--radius);
   background: var(--card);
+  color: var(--card-text);
+  font-family: var(--card-font);
   backdrop-filter: blur(4px);
   border: 1px solid #ffffffcc;
   box-shadow: var(--shadow);
@@ -126,7 +132,8 @@ select {
   border: 1px solid #b4c6d2;
   border-radius: 12px;
   padding: 0.58rem 0.7rem;
-  background: #fff;
+  background: var(--card-inner);
+  color: var(--card-text);
 }
 
 button {
@@ -218,7 +225,7 @@ button:disabled {
   border: 1px solid #d8e3ea;
   border-radius: 12px;
   padding: 0.5rem 0.65rem;
-  background: #fff;
+  background: var(--card-inner);
 }
 
 .item-label {
@@ -331,7 +338,7 @@ button:disabled {
 .live-offers-list li {
   border: 1px solid #d8e3ea;
   border-radius: 12px;
-  background: #fff;
+  background: var(--card-inner);
   padding: 0.55rem;
   display: grid;
   grid-template-columns: 1fr auto;
@@ -554,7 +561,7 @@ h3 {
   border: 1px solid #d8e3ea;
   border-radius: 12px;
   padding: 0.5rem 0.65rem;
-  background: #fff;
+  background: var(--card-inner);
 }
 
 .muted {
@@ -861,7 +868,8 @@ h3 {
   border: 1px solid #d8e3ea;
   border-radius: 12px;
   padding: 0.55rem 0.65rem;
-  background: #fff;
+  background: var(--card-inner);
+  color: var(--card-text);
 }
 
 .list li.checked .item-name {
