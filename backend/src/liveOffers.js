@@ -1,6 +1,33 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 
+// Lazy Puppeteer-Import (wird erst beim ersten Browser-Rendering geladen)
+let browserPromise = null;
+async function getBrowser() {
+  if (!browserPromise) {
+    try {
+      const puppeteer = (await import("puppeteer")).default;
+      browserPromise = puppeteer.launch({
+        headless: "new",
+        args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
+      });
+    } catch (e) {
+      console.warn("Puppeteer nicht verfügbar, Fallback auf statisches Fetch:", e.message);
+      browserPromise = null;
+    }
+  }
+  return browserPromise;
+}
+
+function looksLikeRenderedPage(html) {
+  const h = String(html || "");
+  if (h.trim().length < 1000) return false;
+  // Wenn keine Preise/Cent-Werte und kein `__NEXT_DATA__` mit Angebots-Marker, SPA-Verdacht
+  const hasPriceHint = /€|EUR|\d[.,]\d{2}/.test(h);
+  const hasBotPage = /just a moment|cf-browser-verification|access denied|captcha/i.test(h);
+  return hasPriceHint && !hasBotPage;
+}
+
 const TTL_MS = 15 * 60 * 1000;
 const cache = new Map();
 
@@ -96,12 +123,13 @@ function normalizeWhitespace(text) {
 }
 
 function extractEuroPrice(text) {
-  const match = String(text || "").match(/(\d{1,3}(?:[.,]\d{1,2})?)\s*€/);
-  if (!match) {
+  // Erlaubt auch Varianten wie "12,99EUR", "1,09 € /100g", "(2.49)"
+  const match = String(text || "").match(/(?:€|EUR|euro)\s*(\d{1,3}(?:[.,]\d{1,2})?)|(\d{1,3}(?:[.,]\d{1,2})?)\s*(?:€|EUR|euro)/i);
+  const rawValue = match ? (match[1] || match[2]) : null;
+  if (rawValue == null) {
     return null;
   }
-
-  const value = Number(match[1].replace(",", "."));
+  const value = Number(rawValue.replace(",", "."));
   return Number.isFinite(value) ? value : null;
 }
 
@@ -150,17 +178,71 @@ function isValidHttpUrl(value) {
   }
 }
 
+async function renderWithBrowser(url) {
+  const browser = await getBrowser();
+  if (!browser) return null;
+  let page;
+  try {
+    page = await browser.newPage();
+    // Nur EIN page.goto mit sofortiger Auflösung (domcontentloaded), dann festes Warten.
+    // Dies vermeidet, dass networkidle2 bei SPAs (WebSockets etc.) nie erreicht wird.
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 }).catch(() => {});
+    await sleep(8000);
+    // Scrollen simuliert echte Nutzer-Interaktion und triggert Lazy-Loading
+    await autoScroll(page, 10);
+    const html = await page.content();
+    return html;
+  } catch (e) {
+    console.warn(`Browser-Rendering fehlgeschlagen für ${url}:`, e.message);
+    return null;
+  } finally {
+    if (page) await page.close().catch(() => {});
+  }
+}
+
+async function autoScroll(page, steps = 8) {
+  try {
+    await page.evaluate(async (n) => {
+      for (let i = 0; i < n; i++) {
+        window.scrollBy(0, window.innerHeight * 0.8);
+        await new Promise((r) => setTimeout(r, 600));
+      }
+    }, steps);
+  } catch { /* ignore scroll errors */ }
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 async function fetchHtml(url) {
-  const response = await axios.get(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 FamilyShoppingList/1.0",
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7"
-    },
-    timeout: 10000,
-    maxRedirects: 5
-  });
-  return response.data;
+  let html = null;
+
+  // 1) Schneller statischer Fetch (axios)
+  try {
+    const response = await axios.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 FamilyShoppingList/1.0",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7"
+      },
+      timeout: 12000,
+      maxRedirects: 5
+    });
+    html = response.data;
+  } catch (e) {
+    // axios schlug fehl (Bot-Schutz/403) -> Browser versuchen
+    console.warn(`Statisches Fetch fehlgeschlagen für ${url}:`, e.message);
+    html = null;
+  }
+
+  // 2) Wenn statisch kein brauchbares Rendering mit Preisen liefert -> echtes Browser-Rendering
+  if (!html || !looksLikeRenderedPage(html)) {
+    const rendered = await renderWithBrowser(url);
+    if (rendered) html = rendered;
+  }
+
+  return html;
 }
 
 function extractImgFrom(el, $) {
@@ -219,7 +301,7 @@ function parseAldiOffers(html) {
   return offers;
 }
 
-function parseGenericOffers(html, market, pageUrl) {
+function parseGenericOffers(html, market, pageUrl, extraSelectors = []) {
   const $ = cheerio.load(html);
   const offers = [];
   const seen = new Set();
@@ -233,7 +315,56 @@ function parseGenericOffers(html, market, pageUrl) {
   })();
   const source = sourceLabelFromUrl(pageUrl);
 
-  $("a[href]").each((_, element) => {
+  // 1) JSON-LD "Product" / "Offer" Strukturdaten (werden auch im statischen HTML ausgeliefert)
+  try {
+    $('script[type="application/ld+json"]').each((_, el) => {
+      const raw = $(el).html() || "";
+      const blocks = raw.match(/\{[\s\S]*?\}/g) || [];
+      for (const block of blocks) {
+        try {
+          const obj = JSON.parse(block);
+          const items = Array.isArray(obj) ? obj : (obj["@graph"] ? obj["@graph"] : [obj]);
+          for (const item of items) {
+            const name = normalizeWhitespace(item?.name);
+            if (!name) continue;
+            const price =
+              item?.offers?.price ??
+              (Array.isArray(item?.offers) ? item.offers[0]?.price : undefined) ??
+              item?.price ??
+              item?.lowPrice;
+            if (price == null) continue;
+            const url =
+              absoluteUrl(base, item?.url) ||
+              (item?.offers?.url ? absoluteUrl(base, item.offers.url) : null);
+            const image = item?.image
+              ? (Array.isArray(item.image) ? item.image[0] : item.image)
+              : null;
+            const key = url || `${market}|${name}|${price}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            offers.push({
+              title: name,
+              price: Number(price),
+              url,
+              market,
+              source,
+              image: image ? absoluteUrl(base, image) : null,
+              fetchedAt: new Date().toISOString()
+            });
+          }
+        } catch { /* JSON-LD malformed, skip block */ }
+      }
+    });
+  } catch (e) { /* ignore JSON-LD errors */ }
+
+  // 2) HTML-Selektoren (vielfältig + locker geprüft)
+  const selectors = [
+    "a[href]",
+    ".product a, .offer a, .teaser a, article a, [data-product] a",
+    ...extraSelectors
+  ];
+
+  $((extraSelectors && extraSelectors.length ? selectors : "a[href]")).each((_, element) => {
     if (offers.length >= 220) {
       return;
     }
@@ -244,21 +375,32 @@ function parseGenericOffers(html, market, pageUrl) {
     }
 
     const title = normalizeWhitespace($(element).text());
-    if (!title || title.length < 8 || title.length > 240 || !title.includes("€")) {
+    const context = normalizeWhitespace(
+      $(element).closest("article, li, div, section").text() || title
+    );
+
+    // Preis aus Titel oder Kontext ermitteln
+    const price = extractEuroPrice(`${title} ${context}`);
+
+    // Akzeptiere, wenn Preis gefunden UND (Titel nicht zu kurz ODER Preis direkt im Titel)
+    const titleHasPrice = extractEuroPrice(title) != null;
+    if (price == null) {
       return;
     }
-
-    const context = normalizeWhitespace(
-      $(element).closest("article, li, div").text() || title
-    );
-    const price = extractEuroPrice(`${title} ${context}`);
-    if (price == null) {
+    if (!title || title.length < 3 || title.length > 240) {
+      return;
+    }
+    // Nur sinnvolle Angebote: Titel ohne Preis ok, aber Kontext muss Angebots-Hinweis enthalten
+    const looksLikeOffer =
+      titleHasPrice ||
+      /\b(€|EUR|angebot|preis|rabatt|% reduziert|nur)\b/i.test(context);
+    if (!looksLikeOffer) {
       return;
     }
 
     seen.add(href);
     offers.push({
-      title,
+      title: titleHasPrice ? title : title + ` (${price.toFixed(2)} €)`,
       price,
       url: href,
       market,
@@ -268,11 +410,11 @@ function parseGenericOffers(html, market, pageUrl) {
     });
   });
 
-  return offers;
+  return mergeAndDedupeOffers(offers);
 }
 
 async function fetchLiveOffersForMarket(market, sourceUrl, weekOffset) {
-  const pageUrl = isValidHttpUrl(sourceUrl) ? sourceUrl : buildWeeklyUrl(market, weekOffset);
+  const pageUrl = isValidHttpUrl(sourceUrl) ? sourceUrl : buildWeeklyUrl(market, weekOffset, "");
 
   if (!pageUrl) {
     return { offers: [], available: false, reason: "Keine URL konfiguriert" };
@@ -281,6 +423,14 @@ async function fetchLiveOffersForMarket(market, sourceUrl, weekOffset) {
   if (weekOffset > 0 && !isNextWeekAvailable()) {
     return { offers: [], available: false, reason: "Angebote der nächsten Woche sind noch nicht verfügbar" };
   }
+
+  // Marktspezifische Selektoren, die zusätzlich zum generischen Ansatz geprüft werden
+  const EXTRA_SELECTORS = {
+    REWE: [".it-gallery-tile a, .sale-header a, .teaser-teaser a, [data-testid='product-tile'] a"],
+    EDEKA: [".mf-offer a, .prospekt-teaser a, [class*='offer'] a, [class*='product'] a"],
+    ALDI: ["[class*='product'] a, [class*='tile'] a, [class*='offer'] a"],
+    LIDL: [".product-group a, [class*='product'] a, [class*='offer'] a, .nuc-offer a"]
+  };
 
   let html;
   try {
@@ -299,7 +449,7 @@ async function fetchLiveOffersForMarket(market, sourceUrl, weekOffset) {
     return { offers: [], available: false, reason: "Leere Seite empfangen" };
   }
 
-  const generic = parseGenericOffers(html, market, pageUrl);
+  const generic = parseGenericOffers(html, market, pageUrl, EXTRA_SELECTORS[market] || []);
 
   if (market === "ALDI") {
     const aldiSpecific = parseAldiOffers(html);
@@ -309,6 +459,18 @@ async function fetchLiveOffersForMarket(market, sourceUrl, weekOffset) {
 
   if (generic.length === 0 && weekOffset > 0) {
     return { offers: [], available: false, reason: "Angebote der nächsten Woche sind noch nicht verfügbar" };
+  }
+
+  // Hinweis, wenn auf einer Seite nichts gefunden wurde: oft SPA / JS-gerendert
+  if (generic.length === 0) {
+    return {
+      offers: [],
+      available: true,
+      pageUrl,
+      warning:
+        "Die Seite ist vermutlich JavaScript-gerendert (SPA) und liefert nur den statischen Rahmen. " +
+        "Bitte eine direkte Filial-URL unter Einstellungen → Filialen hinterlegen."
+    };
   }
 
   return { offers: generic, available: true, pageUrl };
