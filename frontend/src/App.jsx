@@ -521,6 +521,26 @@ export default function App() {
     }
   };
 
+  const addMiniListToRecurring = async (miniList) => {
+    if (!session) return;
+    for (const item of miniList.items || []) {
+      try {
+        await api(`/families/${session.familyId}/recurring`, { method: "POST", body: JSON.stringify({ name: item.name, quantity: item.quantity, dayOfWeek: 1, duplicateBehavior: settings.duplicateBehavior }) }, session.token);
+      } catch (e) { setError(e.message); }
+    }
+    try {
+      const data = await api(`/families/${session.familyId}/recurring`, {}, session.token);
+      setRecurringItems(data.recurringItems || []);
+    } catch (e) { setError(e.message); }
+  };
+
+  const deleteDoneItems = async () => {
+    if (!session) return;
+    try {
+      await api(`/families/${session.familyId}/items/done`, { method: "DELETE" }, session.token);
+    } catch (e) { setError(e.message); }
+  };
+
   const resetCardOrder = () => {
     setCardOrder(DEFAULT_CARD_ORDER.slice());
   };
