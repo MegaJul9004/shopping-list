@@ -206,7 +206,7 @@ const CARD_COMPONENTS = {
 };
 
 export default function App() {
-  const { session, setSession, settings, theme, t } = useApp();
+  const { session, setSession, settings, updateSettings, theme, t } = useApp();
 
   const [registerMode, setRegisterMode] = useState("create");
   const [familyName, setFamilyName] = useState("");
