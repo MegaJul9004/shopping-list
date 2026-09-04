@@ -358,6 +358,21 @@ export function deleteMiniList({ listId, familyId }) {
   return changed;
 }
 
+export function updateMiniList({ listId, familyId, name, items }) {
+  const index = store.miniLists.findIndex(
+    (ml) => ml.id === listId && ml.familyId === familyId
+  );
+  if (index < 0) return null;
+  const existing = store.miniLists[index];
+  store.miniLists[index] = {
+    ...existing,
+    name: name ?? existing.name,
+    items: Array.isArray(items) ? items : existing.items
+  };
+  persist();
+  return store.miniLists[index];
+}
+
 // ── Gespeicherte Rezepte ─────────────────────────────────────────────
 export function getSavedRecipes(familyId) {
   return store.savedRecipes

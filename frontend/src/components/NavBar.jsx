@@ -1,8 +1,13 @@
-import { NavLink } from "react-router-dom";
+﻿import { NavLink } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 
 export default function NavBar({ session, onLogout }) {
   const { theme, editorMode, setEditorMode, t } = useApp();
+
+  const handleLogout = () => {
+    if (typeof window !== "undefined" && !window.confirm("Wirklich abmelden?")) return;
+    if (onLogout) onLogout();
+  };
 
   return (
     <nav className="navbar">
@@ -20,7 +25,7 @@ export default function NavBar({ session, onLogout }) {
         <NavLink to="/rezepte" className="nav-link" title={t("nav.recipes")}>🍳 <span className="nav-label">{t("nav.recipes")}</span></NavLink>
         <NavLink to="/settings" className="nav-link" title={t("nav.settings")}>⚙️ <span className="nav-label">{t("nav.settings")}</span></NavLink>
         {session ? (
-          <a href="#" onClick={(e) => { e.preventDefault(); onLogout(); }}>
+          <a href="#" onClick={(e) => { e.preventDefault(); handleLogout(); }}>
             Abmelden ({session.username})
           </a>
         ) : (

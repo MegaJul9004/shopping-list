@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useApp, api } from "../context/AppContext";
+import NavBar from "../components/NavBar";
 
 const MARKETS = ["LIDL", "EDEKA", "ALDI", "REWE"];
 
@@ -23,7 +24,7 @@ function OfferCard({ offer, showWatchTerm }) {
 
 
 export default function OffersPage() {
-  const { session, theme } = useApp();
+  const { session, theme, setSession } = useApp();
   const [liveMarketView, setLiveMarketView] = useState("ALL");
   const [liveOffers, setLiveOffers] = useState([]);
   const [liveOffersHasMore, setLiveOffersHasMore] = useState(false);
@@ -198,6 +199,7 @@ export default function OffersPage() {
 
   return (
     <div className="page-shell">
+      <NavBar session={session} onLogout={() => { if (typeof window !== "undefined") { localStorage.removeItem("shopping_session"); window.location.href = "/"; } setSession(null); }} />
       <div className="hero">
         <p className="eyebrow">Angebote · {weekLabel}</p>
         <h1>Markt-Angebote durchsuchen & vergleichen</h1>

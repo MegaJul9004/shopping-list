@@ -33,6 +33,7 @@ import {
   smartAddItem,
   updateItem,
   searchBranchesByZip,
+  updateMiniList,
   getSavedRecipes,
   getSavedRecipe,
   addSavedRecipe,
@@ -47,6 +48,7 @@ import {
   getLiveOffers
 } from "./liveOffers.js";
 import { searchChefkoch, getRecipeDetail } from "./recipeSearch.js";
+import { fetchStoreOffers } from "./services/offersService.js";
 
 const familyCode = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 6);
 const jwtSecret = process.env.JWT_SECRET || "dev-secret-change-me-in-production";
@@ -518,6 +520,21 @@ app.post("/api/families/:familyId/mini-lists", authMiddleware, (req, res) => {
   return res.status(201).json({ ok: true });
 });
 
+app.patch("/api/families/:familyId/mini-lists/:listId", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  const listId = String(req.params.listId || "");
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed" });
+  }
+  const name = String(req.body?.name || "").trim();
+  const items = Array.isArray(req.body?.items) ? req.body.items : undefined;
+  const updated = updateMiniList({ listId, familyId, name: name || undefined, items });
+  if (!updated) {
+    return res.status(404).json({ error: "List not found" });
+  }
+  return res.json({ miniList: updated });
+});
+
 app.delete("/api/families/:familyId/mini-lists/:listId", authMiddleware, (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
   const listId = String(req.params.listId || "");
@@ -686,6 +703,17 @@ app.get("/api/offers/markets", (_req, res) => {
 });
 
 // Live offers per market with user-specific branch URLs
+app.get("/api/offers/store", authMiddleware, async (req, res) => {
+  const name = String(req.query.name || "LIDL");
+  const zip = String(req.query.zip || "");
+  try {
+    const offers = await fetchStoreOffers(name, zip);
+    return res.json({ offers });
+  } catch (error) {
+    return res.json({ offers: [], error: error instanceof Error ? error.message : "Unknown error" });
+  }
+});
+
 app.get("/api/offers/live", authMiddleware, async (req, res) => {
   const market = String(req.query.market || "ALL").toUpperCase();
   const offset = Number(req.query.offset || "0");

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useApp, api } from "../context/AppContext";
+import NavBar from "../components/NavBar";
 
 /** Skaliert eine Menge um einen Faktor (Integer, Bruch oder Zahl+Einheit). */
 function scaleAmount(line, factor) {
@@ -25,7 +26,7 @@ function formatNum(n) {
 }
 
 export default function RecipesPage() {
-  const { session, settings, t } = useApp();
+  const { session, settings, t, setSession } = useApp();
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -58,7 +59,11 @@ export default function RecipesPage() {
     try {
       const d = await api(`/recipes/detail?url=${encodeURIComponent(recipe.url)}`);
       setDetail({ ...d, url: recipe.url });
-    } catch (e) { setError(e.message); }
+    } catch (e) {
+      // Detail nicht abrufbar (z.B. abgelaufenes/404-Rezept): trotzdem als Link anbieten
+      setDetail({ title: recipe.title, url: recipe.url, ingredients: [], servings: 4, fallback: true });
+      setError("Rezeptdetails konnten nicht geladen werden – der Link zu Chefkoch steht unten bereit.");
+    }
   };
 
   const saveRecipe = async () => {
@@ -140,6 +145,7 @@ export default function RecipesPage() {
 
   return (
     <div className="page-shell">
+      <NavBar session={session} onLogout={() => { if (typeof window !== "undefined") { localStorage.removeItem("shopping_session"); window.location.href = "/"; } setSession(null); }} />
       <header className="hero">
         <p className="eyebrow">Chefkoch · Rezepte</p>
         <h1>🍳 {t("nav.recipes")}</h1>
@@ -173,7 +179,10 @@ export default function RecipesPage() {
             <h2>{detail.title}</h2>
             {detail.image && <img src={detail.image} alt={detail.title} style={{ width: "100%", maxHeight: "260px", objectFit: "cover", borderRadius: "10px" }} />}
             <p className="muted">Portionen: {detail.servings} · Zutaten: {detail.ingredients.length}</p>
-            <button type="button" onClick={saveRecipe}>💾 Speichern</button>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+              <button type="button" onClick={saveRecipe} disabled={detail.fallback}>💾 Speichern</button>
+              <a href={detail.url} target="_blank" rel="noreferrer" className="btn-inline">🔗 Auf Chefkoch öffnen</a>
+            </div>
           </section>
         )}
       </div>

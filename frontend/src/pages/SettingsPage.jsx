@@ -27,6 +27,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [branches, setBranches] = useState({});
   const [branchMessage, setBranchMessage] = useState("");
+  const [lidlLiveOffers, setLidlLiveOffers] = useState(null); // {count, sample[]}
 
   // PLZ / Address search
   const [zipInput, setZipInput] = useState("");
@@ -109,6 +110,17 @@ export default function SettingsPage() {
       setBranchMessage(`✓ Alle ${saved} Filialen gespeichert`);
     }
     setZipSaving(false);
+
+    // Live-LIDL-Angebote laden, falls eine LIDL-Filiale mit PLZ gespeichert wurde
+    const lidlEntry = zipResults.find((r) => r.market === "LIDL");
+    if (lidlEntry && lidlEntry.zip) {
+      try {
+        const data = await api(`/offers/store?name=LIDL&zip=${encodeURIComponent(String(lidlEntry.zip))}`, {}, session.token);
+        setLidlLiveOffers({ count: (data.offers || []).length, sample: (data.offers || []).slice(0, 5) });
+      } catch {
+        setLidlLiveOffers({ count: 0, sample: [] });
+      }
+    }
     setZipResults([]);
     setZipInput("");
   };
@@ -313,6 +325,24 @@ export default function SettingsPage() {
               );
             })}
           </div>
+
+          {lidlLiveOffers && (
+            <div className="card" style={{ marginTop: "0.8rem", padding: "0.8rem", background: "var(--card)" }}>
+              <h3 style={{ margin: "0 0 0.4rem" }}>🛒 Live LIDL-Angebote</h3>
+              <p className="muted" style={{ margin: 0 }}>
+                {lidlLiveOffers.count > 0
+                  ? `${lidlLiveOffers.count} aktuelle Angebote über die LIDL-API geladen.`
+                  : "Keine Angebote über die LIDL-API abrufbar."}
+              </p>
+              {lidlLiveOffers.sample.length > 0 && (
+                <ul className="recurring-list" style={{ marginTop: "0.5rem" }}>
+                  {lidlLiveOffers.sample.map((o, i) => (
+                    <li key={i}><span>{o.title}</span><span className="item-qty">{Number.isFinite(o.price) ? o.price.toFixed(2) + " €" : ""}</span></li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </section>
       </div>
       <div style={{ display: "flex", justifyContent: "center", marginTop: "1rem" }}>

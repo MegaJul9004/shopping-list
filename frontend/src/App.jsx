@@ -40,7 +40,7 @@ function CardShopping(p) {
         <button type="button" onClick={p.addItem}>Hinzufügen</button>
       </div>
       <ul className="list">
-        {p.items.map((item) => (
+        {p.items.filter((i) => !i.checked).map((item) => (
           <li key={item.id} className={item.checked ? "checked" : ""}>
             <label className="item-row">
               <input type="checkbox" checked={item.checked} onChange={() => p.toggleItem(item.id, item.checked)} />
@@ -54,6 +54,26 @@ function CardShopping(p) {
           </li>
         ))}
       </ul>
+      {p.items.some((i) => i.checked) && (
+        <div className="done-section">
+          <h3 className="done-title">✅ Erledigt</h3>
+          <ul className="list">
+            {p.items.filter((i) => i.checked).map((item) => (
+              <li key={item.id} className="checked done-item">
+                <label className="item-row">
+                  <input type="checkbox" checked={item.checked} onChange={() => p.toggleItem(item.id, item.checked)} />
+                  <span className="item-name">{item.name}</span>
+                  <span className="item-qty">{item.quantity}x</span>
+                </label>
+                <div className="item-actions">
+                  <button className="danger" onClick={() => p.deleteItem(item.id)}>Löschen</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <button className="ghost" style={{ marginTop: "0.4rem" }} onClick={() => { const done = p.items.filter((i) => i.checked); done.forEach((i) => p.toggleItem(i.id, true)); }}>Alle abhaken</button>
+        </div>
+      )}
     </section>
   );
 }
@@ -67,10 +87,11 @@ function CardMiniLists(p) {
       </div>
       <div className="add-form" style={{ gridTemplateColumns: "1fr auto" }}>
         <input type="text" placeholder="Listenname" value={p.miniListName} onChange={(e) => p.setMiniListName(e.target.value)} />
-        <button type="button" onClick={() => p.setShowMiniListEditor(true)}>+ Neu</button>
+        <button type="button" onClick={() => { if (p.setEditingMiniListId) p.setEditingMiniListId(null); p.setMiniListName(""); p.setMiniListItems([]); p.setShowMiniListEditor(true); }}>+ Neu</button>
       </div>
       {p.showMiniListEditor && (
         <div className="mini-form">
+          {p.editingMiniListId && <p className="muted" style={{ margin: 0 }}>✏️ Bearbeite Mini-Liste …</p>}
           <input type="text" placeholder="Zutat (Enter)" value={p.miniListItemInput} onChange={(e) => p.setMiniListItemInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && p.miniListItemInput.trim()) { p.setMiniListItems([...p.miniListItems, { name: p.miniListItemInput.trim(), quantity: 1 }]); p.setMiniListItemInput(""); } }} />
           <ul className="recurring-list" style={{ margin: "0.4rem 0" }}>
             {p.miniListItems.map((mi, idx) => (
@@ -79,7 +100,7 @@ function CardMiniLists(p) {
           </ul>
           <div className="switch-row">
             <button onClick={p.saveMiniList}>Speichern</button>
-            <button className="ghost" onClick={() => { p.setShowMiniListEditor(false); p.setMiniListItems([]); }}>Abbrechen</button>
+            <button className="ghost" onClick={() => { p.setShowMiniListEditor(false); p.setMiniListItems([]); if (p.setEditingMiniListId) p.setEditingMiniListId(null); }}>Abbrechen</button>
           </div>
         </div>
       )}
@@ -90,6 +111,7 @@ function CardMiniLists(p) {
               <div><strong>{ml.name}</strong><p className="muted">{ml.items.length} Zutaten</p></div>
               <div className="item-actions">
                 <button onClick={() => p.addMiniListToShopping(ml)}>+ Zur Liste</button>
+                <button className="ghost" onClick={() => p.startEditMiniList(ml)}>✏️</button>
                 <button className="danger" onClick={() => p.deleteMiniList(ml.id)}>✕</button>
               </div>
             </li>
@@ -193,6 +215,7 @@ export default function App() {
   const [showMiniListEditor, setShowMiniListEditor] = useState(false);
   const [miniListItemInput, setMiniListItemInput] = useState("");
   const [miniListItems, setMiniListItems] = useState([]);
+  const [editingMiniListId, setEditingMiniListId] = useState(null);
   const [editorMode, setEditorMode] = useState(() => {
     try { return localStorage.getItem(EDITOR_STORAGE_KEY) === "1"; } catch { return false; }
   });
@@ -273,6 +296,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    if (typeof window !== "undefined" && !window.confirm("Wirklich abmelden?")) return;
     setSession(null);
     setItems([]); setRecipes([]); setSelectedIngredients([]); setRecurringItems([]);
   };
@@ -341,11 +365,22 @@ export default function App() {
   const saveMiniList = async () => {
     if (!miniListName.trim() || miniListItems.length === 0 || !session) return;
     try {
-      await api(`/families/${session.familyId}/mini-lists`, { method: "POST", body: JSON.stringify({ name: miniListName.trim(), items: miniListItems }) }, session.token);
-      setMiniListName(""); setMiniListItems([]); setShowMiniListEditor(false);
+      if (editingMiniListId) {
+        await api(`/families/${session.familyId}/mini-lists/${editingMiniListId}`, { method: "PATCH", body: JSON.stringify({ name: miniListName.trim(), items: miniListItems }) }, session.token);
+      } else {
+        await api(`/families/${session.familyId}/mini-lists`, { method: "POST", body: JSON.stringify({ name: miniListName.trim(), items: miniListItems }) }, session.token);
+      }
+      setMiniListName(""); setMiniListItems([]); setShowMiniListEditor(false); setEditingMiniListId(null);
       const data = await api(`/families/${session.familyId}/mini-lists`, {}, session.token);
       setMiniLists(data.miniLists || []);
     } catch (e) { setError(e.message); }
+  };
+
+  const startEditMiniList = (ml) => {
+    setMiniListName(ml.name);
+    setMiniListItems(ml.items.map((it) => (typeof it === "string" ? { name: it, quantity: 1 } : it)));
+    setEditingMiniListId(ml.id);
+    setShowMiniListEditor(true);
   };
 
   const deleteMiniList = async (listId) => {
@@ -413,6 +448,7 @@ export default function App() {
     miniListItemInput, setMiniListItemInput,
     miniListItems, setMiniListItems,
     saveMiniList, deleteMiniList, addMiniListToShopping,
+    startEditMiniList, editingMiniListId, setEditingMiniListId,
     recurringItems, recurName, setRecurName,
     recurQty, setRecurQty, recurDay, setRecurDay,
     addRecurring, deleteRecurring,
@@ -605,6 +641,7 @@ export default function App() {
               <div style={{display:"flex",gap:"0.5rem",marginTop:"0.6rem",flexWrap:"wrap"}}>
                 <Link to="/settings" className="btn-inline">⚙️ Einstellungen</Link>
                 <Link to="/offers" className="btn-inline">🏷️ Angebote</Link>
+                <Link to="/rezepte" className="btn-inline">🍳 Rezepte</Link>
                 <button
                   type="button"
                   className="btn-inline"
