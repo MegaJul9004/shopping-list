@@ -102,12 +102,70 @@ export async function getRecipeDetail(url) {
     });
   }
 
-  // Zubereitung
+  // Zubereitung: bevorzugt aus dem eingebetteten JSON-LD (schema.org Recipe)
   const instructions = [];
-  $(".recipe-preparation ol li, .preparation ol li, ol[class*='preparation'] li, .instructions li").each((_, el) => {
-    const step = $(el).text().replace(/\s+/g, " ").trim();
-    if (step && instructions.length < 30) instructions.push(step);
+  $('script[type="application/ld+json"]').each((_, el) => {
+    if (instructions.length > 0) return;
+    const raw = $(el).html() || "";
+    if (!/recipeInstructions|@type["':\s]*(?:Recipes?)/i.test(raw)) return;
+    try {
+      const parsed = JSON.parse(raw);
+      const graph = Array.isArray(parsed) ? parsed : (parsed["@graph"] ? parsed["@graph"] : [parsed]);
+      const collectSteps = (ri) => {
+        for (const step of ri) {
+          if (instructions.length >= 30) break;
+          if (!step || typeof step !== "object") {
+            const t = String(step || "").replace(/\s+/g, " ").trim();
+            if (t) instructions.push(t);
+            continue;
+          }
+          const type = step["@type"] || "";
+          if (String(type).toLowerCase().includes("section")) {
+            // HowToSection -> itemListElement enthält die Schritte
+            if (Array.isArray(step.itemListElement)) collectSteps(step.itemListElement);
+            continue;
+          }
+          const text = (step.text || step.name || "").replace(/\s+/g, " ").trim();
+          if (text) instructions.push(text);
+        }
+      };
+      for (const node of graph) {
+        const ri = node.recipeInstructions || (node["@type"] === "Recipe" ? node.recipeInstructions : null);
+        if (Array.isArray(ri)) {
+          collectSteps(ri);
+          if (instructions.length > 0) break;
+        }
+      }
+    } catch { /* malformed JSON-LD */ }
   });
+
+  // Fallback 1: HTML-Selektoren
+  if (instructions.length === 0) {
+    const primarySelectors = [
+      ".recipe-preparation ol li", ".preparation ol li",
+      "ol[class*='preparation'] li", ".instructions li",
+      "#rezept-zubereitung ol li", "[class*='zubereitung'] li"
+    ];
+    for (const sel of primarySelectors) {
+      if (instructions.length > 0) break;
+      $(sel).each((_, el) => {
+        const step = $(el).text().replace(/\s+/g, " ").trim();
+        if (step && step.length > 10 && instructions.length < 30) instructions.push(step);
+      });
+    }
+  }
+
+  // Fallback 2: jedes <ol> mit ≥2 längeren <li>-Elementen
+  if (instructions.length === 0) {
+    $("ol").each((_, ol) => {
+      if (instructions.length > 0) return;
+      const lis = $(ol).find("> li")
+        .map((_, li) => $(li).text().replace(/\s+/g, " ").trim())
+        .get()
+        .filter((t) => t && t.length > 20);
+      if (lis.length >= 2) lis.slice(0, 30).forEach((t) => instructions.push(t));
+    });
+  }
 
   return {
     title: title || "Rezept",

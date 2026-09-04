@@ -68,7 +68,8 @@ export function AppProvider({ children }) {
       dateFormat: "DD.MM.YYYY",
       currency: "EUR",
       numberFormat: "comma",
-      weekStart: 1
+      weekStart: 1,
+      autoDeleteDone: false
     };
   });
 

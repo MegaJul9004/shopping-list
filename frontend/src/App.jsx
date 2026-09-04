@@ -13,6 +13,7 @@ function getSocket() {
 }
 
 const DAY_NAMES = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+const DAY_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const DEFAULT_CARD_ORDER = ["shopping", "minilists", "recurring", "recipes"];
 const CARD_STORAGE_KEY = "shopping_card_order";
 const EDITOR_STORAGE_KEY = "shopping_editor_mode";
@@ -27,17 +28,35 @@ function CardShopping(p) {
   return (
     <section className="card" data-card-id="shopping">
       <div className="card-header-row">
-        <h2>Einkaufsliste</h2>
+        <h2>{p.t ? p.t("list.title") : "Einkaufsliste"}</h2>
         {p.editorMode && <span className="editor-card-badge">Position {p.cardOrder.indexOf("shopping") + 1}</span>}
       </div>
       <div className="family-chip">
-        <span className="muted">Menge erhöhen: {p.settings.duplicateBehavior === "merge" ? "\u2705 An" : "\u274c Aus"}</span>
+        <span className="muted">{p.t ? p.t("list.quantity") : "Menge erhöhen"}: {p.settings.duplicateBehavior === "merge" ? "✅ An" : "❌ Aus"}</span>
         <Link to="/settings">Einstellungen</Link>
       </div>
+      {typeof p.updateSettings === "function" && (
+        <div className="family-chip" style={{ marginTop: "0.2rem" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0 }}>
+            <input type="checkbox" checked={!!p.settings.autoDeleteDone}
+              onChange={(e) => p.updateSettings({ autoDeleteDone: e.target.checked })} />
+            <span className="muted" style={{ fontSize: "0.85rem" }}>{p.t ? p.t("list.autoDelete") : "Erledigtes automatisch löschen"}</span>
+          </label>
+        </div>
+      )}
       <div className="add-form">
-        <input type="text" placeholder="Artikel eingeben" value={p.itemName} onChange={(e) => p.setItemName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); p.addItem(); } }} />
+        <textarea
+          className="auto-grow"
+          rows={1}
+          placeholder={p.t ? p.t("list.itemPlaceholder") : "Artikel eingeben"}
+          value={p.itemName}
+          onChange={(e) => p.setItemName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); p.addItem(); } }}
+          style={{ resize: "none", overflow: "hidden" }}
+          ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
+        />
         <input type="number" min={1} value={p.itemQty} onChange={(e) => p.setItemQty(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); p.addItem(); } }} />
-        <button type="button" onClick={p.addItem}>Hinzufügen</button>
+        <button type="button" onClick={p.addItem}>{p.t ? p.t("list.add") : "Hinzufügen"}</button>
       </div>
       <ul className="list">
         {p.items.filter((i) => !i.checked).map((item) => (
@@ -56,7 +75,7 @@ function CardShopping(p) {
       </ul>
       {p.items.some((i) => i.checked) && (
         <div className="done-section">
-          <h3 className="done-title">✅ Erledigt</h3>
+          <h3 className="done-title">✅ {p.t ? p.t("list.done") : "Erledigt"}</h3>
           <ul className="list">
             {p.items.filter((i) => i.checked).map((item) => (
               <li key={item.id} className="checked done-item">
@@ -71,7 +90,7 @@ function CardShopping(p) {
               </li>
             ))}
           </ul>
-          <button className="ghost" style={{ marginTop: "0.4rem" }} onClick={() => { const done = p.items.filter((i) => i.checked); done.forEach((i) => p.toggleItem(i.id, true)); }}>Alle abhaken</button>
+          <button className="ghost" style={{ marginTop: "0.4rem" }} onClick={p.deleteDoneItems}>🗑️ {p.t ? p.t("list.clearDone") : "Erledigte löschen"}</button>
         </div>
       )}
     </section>
@@ -111,6 +130,7 @@ function CardMiniLists(p) {
               <div><strong>{ml.name}</strong><p className="muted">{ml.items.length} Zutaten</p></div>
               <div className="item-actions">
                 <button onClick={() => p.addMiniListToShopping(ml)}>+ Zur Liste</button>
+                <button className="ghost" onClick={() => p.addMiniListToRecurring(ml)}>🔄 Wiederkehrend</button>
                 <button className="ghost" onClick={() => p.startEditMiniList(ml)}>✏️</button>
                 <button className="danger" onClick={() => p.deleteMiniList(ml.id)}>✕</button>
               </div>
@@ -130,17 +150,17 @@ function CardRecurring(p) {
         {p.editorMode && <span className="editor-card-badge">Position {p.cardOrder.indexOf("recurring") + 1}</span>}
       </div>
       <div className="recurring-form">
-        <input type="text" placeholder="Artikel" value={p.recurName} onChange={(e) => p.setRecurName(e.target.value)} />
-        <input type="number" min={1} value={p.recurQty} onChange={(e) => p.setRecurQty(Math.max(1, Number(e.target.value)))} />
+        <input type="text" placeholder="Artikel" value={p.recurName} onChange={(e) => p.setRecurName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); p.addRecurring(); } }} />
+        <input type="number" min={1} value={p.recurQty} onChange={(e) => p.setRecurQty(Math.max(1, Number(e.target.value)))} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); p.addRecurring(); } }} />
         <select value={p.recurDay} onChange={(e) => p.setRecurDay(Number(e.target.value))}>
-          {DAY_NAMES.map((name, idx) => <option key={idx} value={idx}>{name}</option>)}
+          {DAY_SHORT.map((name, idx) => <option key={idx} value={idx}>{name}</option>)}
         </select>
         <button type="button" onClick={p.addRecurring}>+ Hinzufügen</button>
       </div>
       {p.recurringItems.length > 0 && (
         <ul className="recurring-list">
           {p.recurringItems.map((ritem) => (
-            <li key={ritem.id}><span>{ritem.name} ({ritem.quantity}x) - <span className="muted">{DAY_NAMES[ritem.dayOfWeek]}</span></span><button className="danger" onClick={() => p.deleteRecurring(ritem.id)}>✕</button></li>
+            <li key={ritem.id}><span>{ritem.name} ({ritem.quantity}x) - <span className="muted">{DAY_SHORT[ritem.dayOfWeek] || DAY_NAMES[ritem.dayOfWeek]}</span></span><button className="danger" onClick={() => p.deleteRecurring(ritem.id)}>✕</button></li>
           ))}
         </ul>
       )}
@@ -152,20 +172,22 @@ function CardRecipes(p) {
   return (
     <section className="card" data-card-id="recipes">
       <div className="card-header-row">
-        <h2>🍳 Rezepte finden</h2>
+        <h2>🍳 {p.t ? p.t("recipes.title") : "Rezepte finden"}</h2>
         {p.editorMode && <span className="editor-card-badge">Position {p.cardOrder.indexOf("recipes") + 1}</span>}
       </div>
       <div className="recipe-form">
-        <input type="text" placeholder="Suchbegriff" value={p.recipeQuery} onChange={(e) => p.setRecipeQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && p.searchRecipes()} />
-        <button type="button" onClick={p.searchRecipes} disabled={p.loadingRecipes}>{p.loadingRecipes ? "Suche..." : "Suchen"}</button>
+        <input type="text" placeholder={p.t ? p.t("recipes.searchPlaceholder") : "Suchbegriff"} value={p.recipeQuery} onChange={(e) => p.setRecipeQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); p.searchRecipes(); } }} />
+        <button type="button" onClick={p.searchRecipes} disabled={p.loadingRecipes}>{p.loadingRecipes ? "Suche..." : (p.t ? p.t("recipes.search") : "Suchen")}</button>
       </div>
-      {p.recipes.length > 0 && (
-        <ul className="list">{p.recipes.map((r, i) => <li key={i}><a href={r.url} target="_blank" rel="noreferrer">{r.title}</a></li>)}</ul>
-      )}
+      <div className="recipe-results-panel">
+        {p.recipes.length > 0 && (
+          <ul className="list">{p.recipes.map((r, i) => <li key={i}><a href={r.url} target="_blank" rel="noreferrer">{r.title}</a></li>)}</ul>
+        )}
+      </div>
       <p className="muted" style={{ marginTop: "0.5rem" }}>Oder nach Zutaten:</p>
       <div className="recipe-filters">
         <input type="text" placeholder="Zutat (Enter)" value={p.ingredientInput} onChange={(e) => p.setIngredientInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && p.ingredientInput.trim()) { p.setSelectedIngredients([...p.selectedIngredients, p.ingredientInput.trim()]); p.setIngredientInput(""); } }} />
-        <button type="button" onClick={p.searchByIngredients} disabled={p.selectedIngredients.length === 0 || p.loadingRecipes}>{p.loadingRecipes ? "Suche..." : "Rezepte finden"}</button>
+        <button type="button" onClick={p.searchByIngredients} disabled={p.selectedIngredients.length === 0 || p.loadingRecipes}>{p.loadingRecipes ? "Suche..." : (p.t ? p.t("recipes.byIngredients") : "Rezepte finden")}</button>
       </div>
       <div className="family-chip">
         {p.selectedIngredients.map((ing, idx) => (
@@ -184,7 +206,7 @@ const CARD_COMPONENTS = {
 };
 
 export default function App() {
-  const { session, setSession, settings, theme } = useApp();
+  const { session, setSession, settings, theme, t } = useApp();
 
   const [registerMode, setRegisterMode] = useState("create");
   const [familyName, setFamilyName] = useState("");
@@ -232,6 +254,91 @@ export default function App() {
   const dragSrcIdx = useRef(-1);
   const [dragOverIdx, setDragOverIdx] = useState(-1);
 
+  // ── Free Editor Mode (pixelgenaues Positionieren + Skalieren) ─────────
+  const FREE_EDITOR_KEY = "shopping_free_editor";
+  const FREE_LAYOUT_KEY = "shopping_free_layout";
+  const [freeEditor, setFreeEditor] = useState(() => {
+    try { return localStorage.getItem(FREE_EDITOR_KEY) === "1"; } catch { return false; }
+  });
+  const [freeLayout, setFreeLayout] = useState(() => {
+    try {
+      const saved = localStorage.getItem(FREE_LAYOUT_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {};
+  });
+  const freeDragId = useRef(null);
+  const freeDragMode = useRef(null); // "move" | "resize"
+  const freeStart = useRef({ x: 0, y: 0, lx: 0, ly: 0 });
+
+  useEffect(() => {
+    try { localStorage.setItem(FREE_EDITOR_KEY, freeEditor ? "1" : "0"); } catch {}
+  }, [freeEditor]);
+
+  useEffect(() => {
+    try { localStorage.setItem(FREE_LAYOUT_KEY, JSON.stringify(freeLayout)); } catch {}
+  }, [freeLayout]);
+
+  const freeCanvasRef = useRef(null);
+  const freeSetRect = (id, patch) => {
+    setFreeLayout((prev) => {
+      const base = prev[id] || { x: 0, y: 0, w: 320, h: 260 };
+      return { ...prev, [id]: { ...base, ...patch } };
+    });
+  };
+
+  const freeMoveStart = (e, id) => {
+    if (!freeEditor) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const canvas = freeCanvasRef.current?.getBoundingClientRect();
+    const base = freeLayout[id] || { x: rect.left - (canvas?.left || 0), y: rect.top - (canvas?.top || 0), w: rect.width, h: rect.height };
+    freeDragId.current = id;
+    freeDragMode.current = "move";
+    freeStart.current = { x: e.clientX, y: e.clientY, lx: base.x, ly: base.y };
+    setFreeLayout((prev) => ({ ...prev, [id]: base }));
+    window.addEventListener("pointermove", freeMove);
+    window.addEventListener("pointerup", freeEnd);
+  };
+
+  const freeResizeStart = (e, id) => {
+    if (!freeEditor) return;
+    e.stopPropagation();
+    const rect = e.currentTarget.parentElement.getBoundingClientRect();
+    const base = freeLayout[id] || { x: 0, y: 0, w: rect.width, h: rect.height };
+    freeDragId.current = id;
+    freeDragMode.current = "resize";
+    freeStart.current = { x: e.clientX, y: e.clientY, w: base.w, h: base.h };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const freeMove = (e) => {
+    const id = freeDragId.current;
+    if (!id) return;
+    const canvas = freeCanvasRef.current?.getBoundingClientRect();
+    if (freeDragMode.current === "move") {
+      const dx = e.clientX - freeStart.current.x;
+      const dy = e.clientY - freeStart.current.y;
+      const nx = Math.max(0, Math.round(freeStart.current.lx + dx));
+      const ny = Math.max(0, Math.round(freeStart.current.ly + dy));
+      freeSetRect(id, { x: nx, y: ny });
+    } else if (freeDragMode.current === "resize") {
+      const dw = e.clientX - freeStart.current.x;
+      const dh = e.clientY - freeStart.current.y;
+      freeSetRect(id, { w: Math.max(180, Math.round(freeStart.current.w + dw)), h: Math.max(140, Math.round(freeStart.current.h + dh)) });
+    }
+  };
+
+  const freeEnd = () => {
+    freeDragId.current = null;
+    freeDragMode.current = null;
+    window.removeEventListener("pointermove", freeMove);
+    window.removeEventListener("pointerup", freeEnd);
+  };
+
+  const resetFreeLayout = () => {
+    setFreeLayout({});
+  };
+
   useEffect(() => {
     try { localStorage.setItem(EDITOR_STORAGE_KEY, editorMode ? "1" : "0"); } catch {}
   }, [editorMode]);
@@ -246,9 +353,15 @@ export default function App() {
     socket.connect();
     socket.emit("joinFamily", { token: session.token });
     const onItemsSnapshot = (nextItems) => setItems(nextItems);
+    const onRecurringSnapshot = (next) => setRecurringItems(next);
+    const onMiniListsSnapshot = (next) => setMiniLists(next);
     socket.on("itemsSnapshot", onItemsSnapshot);
+    socket.on("recurringSnapshot", onRecurringSnapshot);
+    socket.on("miniListsSnapshot", onMiniListsSnapshot);
     return () => {
       socket.off("itemsSnapshot", onItemsSnapshot);
+      socket.off("recurringSnapshot", onRecurringSnapshot);
+      socket.off("miniListsSnapshot", onMiniListsSnapshot);
       socket.disconnect();
     };
   }, [session]);
@@ -312,8 +425,16 @@ export default function App() {
 
   const toggleItem = async (itemId, currentChecked) => {
     if (!session) return;
+    const willCheck = !currentChecked;
+    // Option "Erledigtes automatisch löschen" an
+    if (willCheck && settings.autoDeleteDone) {
+      try {
+        await api(`/families/${session.familyId}/items/${itemId}`, { method: "DELETE" }, session.token);
+      } catch (e) { setError(e.message); }
+      return;
+    }
     try {
-      await api(`/families/${session.familyId}/items/${itemId}`, { method: "PATCH", body: JSON.stringify({ checked: !currentChecked }) }, session.token);
+      await api(`/families/${session.familyId}/items/${itemId}`, { method: "PATCH", body: JSON.stringify({ checked: willCheck }) }, session.token);
     } catch (e) { setError(e.message); }
   };
 
@@ -347,7 +468,7 @@ export default function App() {
   const addRecurring = async () => {
     if (!recurName.trim() || !session) return;
     try {
-      await api(`/families/${session.familyId}/recurring`, { method: "POST", body: JSON.stringify({ name: recurName.trim(), quantity: recurQty, dayOfWeek: recurDay }) }, session.token);
+      await api(`/families/${session.familyId}/recurring`, { method: "POST", body: JSON.stringify({ name: recurName.trim(), quantity: recurQty, dayOfWeek: recurDay, duplicateBehavior: settings.duplicateBehavior }) }, session.token);
       setRecurName(""); setRecurQty(1);
       const data = await api(`/families/${session.familyId}/recurring`, {}, session.token);
       setRecurringItems(data.recurringItems || []);
@@ -440,6 +561,8 @@ export default function App() {
     editorMode,
     cardOrder,
     settings,
+    updateSettings,
+    t,
     itemName, setItemName,
     itemQty, setItemQty,
     items, addItem, toggleItem, deleteItem,
@@ -448,6 +571,7 @@ export default function App() {
     miniListItemInput, setMiniListItemInput,
     miniListItems, setMiniListItems,
     saveMiniList, deleteMiniList, addMiniListToShopping,
+    addMiniListToRecurring, deleteDoneItems,
     startEditMiniList, editingMiniListId, setEditingMiniListId,
     recurringItems, recurName, setRecurName,
     recurQty, setRecurQty, recurDay, setRecurDay,
@@ -659,31 +783,58 @@ export default function App() {
                     ↺ Reihenfolge zurücksetzen
                   </button>
                 )}
+                <button
+                  type="button"
+                  className="btn-inline"
+                  style={{
+                    background: freeEditor ? "rgba(42,157,143,0.9)" : "rgba(255,255,255,0.2)",
+                    border: freeEditor ? "2px solid #fff" : "none"
+                  }}
+                  onClick={() => setFreeEditor((v) => !v)}
+                  title="Free Editor: Karten frei positionieren und skalieren"
+                >
+                  {freeEditor ? "✅ Free verlassen" : "🎯 Free"}
+                </button>
+                {freeEditor && (
+                  <button type="button" className="btn-inline ghost-btn-inline" onClick={resetFreeLayout}>
+                    ↺ Layout zurücksetzen
+                  </button>
+                )}
               </div>
-              {editorMode && (
+              {freeEditor && (
                 <p style={{marginTop:"0.8rem",padding:"0.6rem 0.9rem",background:"rgba(255,255,255,0.18)",borderRadius:"10px",fontSize:"0.9rem"}}>
-                  🖱️ Ziehe die Karten per Drag &amp; Drop in die gewünschte Reihenfolge – die Anordnung wird automatisch in deinem Browser gespeichert.
+                  🎯 Free-Modus: Karten per Ziehen frei platzieren und an der Ecke skalieren (pixelgenau).
                 </p>
               )}
             </header>
             {error && <div className="error-banner">{error}</div>}
 
-            <div className={"dashboard-grid editor-allcards" + (editorMode ? " editor-active" : "")}>
+            <div
+              ref={freeCanvasRef}
+              className={"dashboard-grid editor-allcards free-canvas" + (freeEditor ? " free-active" : "") + (editorMode ? " editor-active" : "")}
+            >
               {cardOrder.map((cardId, idx) => {
                 const Comp = CARD_COMPONENTS[cardId];
                 if (!Comp) return null;
                 const isDragOver = dragOverIdx === idx;
+                const fl = freeLayout[cardId];
+                const freeStyle = freeEditor && fl ? { position: "absolute", left: fl.x, top: fl.y, width: fl.w, height: fl.h } : {};
                 return (
                   <div
                     key={cardId}
-                    className={"editor-card-wrap" + (editorMode ? " draggable" : "") + (isDragOver ? " drag-over" : "")}
+                    className={"editor-card-wrap" + (editorMode ? " draggable" : "") + (freeEditor ? " free-draggable" : "") + (isDragOver ? " drag-over" : "")}
                     draggable={editorMode}
                     onDragStart={(e) => editorMode && handleDragStart(e, idx)}
                     onDragOver={(e) => editorMode && handleDragOver(e, idx)}
                     onDragLeave={(e) => editorMode && handleDragLeave(e)}
                     onDrop={(e) => editorMode && handleDrop(e, idx)}
                     onDragEnd={handleDragEnd}
+                    onPointerDown={(e) => freeEditor && freeMoveStart(e, cardId)}
+                    style={freeStyle}
                   >
+                    {freeEditor && (
+                      <div className="free-resize-handle" onPointerDown={(e) => freeResizeStart(e, cardId)} title="Größe ändern" />
+                    )}
                     {editorMode && (
                       <div className="editor-drag-handle" title="Karte verschieben">
                         <span>⋮⋮</span>

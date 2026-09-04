@@ -17,6 +17,7 @@ import {
   deleteItem,
   deleteMiniList,
   deleteRecurringItem,
+  deleteDoneItems,
   getFamilyBranchLocations,
   getFamilyById,
   getFamilyLocations,
@@ -84,6 +85,16 @@ io.on("connection", (socket) => {
 function emitItems(familyId) {
   const items = getItemsByFamily(familyId);
   io.to(familyId).emit("itemsSnapshot", items);
+}
+
+function emitRecurring(familyId) {
+  const recurringItems = getRecurringItemsByFamily(familyId);
+  io.to(familyId).emit("recurringSnapshot", recurringItems);
+}
+
+function emitMiniLists(familyId) {
+  const miniLists = getMiniLists(familyId);
+  io.to(familyId).emit("miniListsSnapshot", miniLists);
 }
 
 app.get("/api/branches/search", (req, res) => {
@@ -345,6 +356,20 @@ app.delete("/api/families/:familyId/items/:itemId", authMiddleware, (req, res) =
   return res.json({ ok: true });
 });
 
+// Löscht alle abgehakten (erledigten) Einkaufs-Artikel auf einmal
+app.delete("/api/families/:familyId/items/done", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed for this family" });
+  }
+  if (!getFamilyById(familyId)) {
+    return res.status(404).json({ error: "Family not found" });
+  }
+  const deleted = deleteDoneItems(familyId);
+  emitItems(familyId);
+  return res.json({ ok: true, deleted });
+});
+
 // —— Wiederkehrende Artikel ————————————————————————————————————————————
 app.get("/api/families/:familyId/recurring", authMiddleware, (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
@@ -376,7 +401,8 @@ app.post("/api/families/:familyId/recurring", authMiddleware, (req, res) => {
     return res.status(400).json({ error: "Item name is required" });
   }
 
-  addRecurringItem({ id: nanoid(10), familyId, name, quantity, dayOfWeek });
+  addRecurringItem({ id: nanoid(10), familyId, name, quantity, dayOfWeek, duplicateBehavior: req.body?.duplicateBehavior });
+  emitRecurring(familyId);
 
   return res.status(201).json({ ok: true });
 });
@@ -396,6 +422,7 @@ app.delete(
     if (!deleted) {
       return res.status(404).json({ error: "Recurring item not found" });
     }
+    emitRecurring(familyId);
 
     return res.json({ ok: true });
   }
@@ -517,6 +544,7 @@ app.post("/api/families/:familyId/mini-lists", authMiddleware, (req, res) => {
     return res.status(400).json({ error: "name and items are required" });
   }
   addMiniList({ id: nanoid(10), familyId, name, items });
+  emitMiniLists(familyId);
   return res.status(201).json({ ok: true });
 });
 
@@ -532,6 +560,7 @@ app.patch("/api/families/:familyId/mini-lists/:listId", authMiddleware, (req, re
   if (!updated) {
     return res.status(404).json({ error: "List not found" });
   }
+  emitMiniLists(familyId);
   return res.json({ miniList: updated });
 });
 
@@ -545,6 +574,7 @@ app.delete("/api/families/:familyId/mini-lists/:listId", authMiddleware, (req, r
   if (!deleted) {
     return res.status(404).json({ error: "List not found" });
   }
+  emitMiniLists(familyId);
   return res.json({ ok: true });
 });
 

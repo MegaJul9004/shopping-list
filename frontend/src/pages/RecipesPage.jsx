@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApp, api } from "../context/AppContext";
 import NavBar from "../components/NavBar";
 
@@ -34,6 +34,26 @@ export default function RecipesPage() {
   const [saved, setSaved] = useState([]);
   const [error, setError] = useState("");
   const [displayOn, setDisplayOn] = useState({});
+  const [wakeLockActive, setWakeLockActive] = useState(false);
+  const wakeLockRef = useRef(null);
+
+  const toggleWakeLock = async () => {
+    if (wakeLockActive) {
+      try { wakeLockRef.current?.release(); } catch {}
+      wakeLockRef.current = null;
+      setWakeLockActive(false);
+      return;
+    }
+    try {
+      if ("wakeLock" in navigator) {
+        const lock = await navigator.wakeLock.request("screen");
+        wakeLockRef.current = lock;
+        setWakeLockActive(true);
+      } else {
+        setError("Screen Wake Lock wird von diesem Browser nicht unterstützt.");
+      }
+    } catch (e) { setError("WakeLock fehlgeschlagen: " + e.message); }
+  };
 
   const fam = session?.familyId;
 
@@ -108,23 +128,22 @@ export default function RecipesPage() {
   };
 
   const setServings = (r, n) => {
-    const replaced = { ...r, targetServings: Math.max(1, Number(n) || 1) };
-    // Live im lokalen State speichern (für die Skalierung im UI)
-    setSaved((prev) => prev.map((r2) => (r2.id === r.id ? replaced : r2)));
-    updateSaved(r.id, { servings: Math.max(1, Number(n) || 1) });
+    const v = Math.max(1, Number(n) || 1);
+    // Zielwert nur im UI-State setzen; die Original-Portionen (Basis) bleiben unverändert.
+    setSaved((prev) => prev.map((r2) => (r2.id === r.id ? { ...r2, targetServings: v } : r2)));
   };
 
   const scaledIngredients = (r, n) => {
-    const target = Number(n) || Number(r.servings) || 4;
     const base = Number(r.servings) || 4;
+    const target = Number(n) || Number(r.targetServings) || base;
     const factor = target / base;
     return (r.ingredients || []).map((ing) => ({ original: ing, scaled: scaleAmount(ing, factor) }));
   };
 
   const addToShopping = async (r, n) => {
     if (!fam) return;
-    const target = Number(n) || Number(r.servings) || 4;
     const base = Number(r.servings) || 4;
+    const target = Number(n) || Number(r.targetServings) || base;
     const factor = target / base;
     for (const ing of r.ingredients) {
       const scaled = scaleAmount(ing, factor);
@@ -181,8 +200,36 @@ export default function RecipesPage() {
             <p className="muted">Portionen: {detail.servings} · Zutaten: {detail.ingredients.length}</p>
             <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
               <button type="button" onClick={saveRecipe} disabled={detail.fallback}>💾 Speichern</button>
-              <a href={detail.url} target="_blank" rel="noreferrer" className="btn-inline">🔗 Auf Chefkoch öffnen</a>
             </div>
+            {(detail.ingredients?.length > 0 || detail.instructions?.length > 0) ? (
+              <div style={{ marginTop: "0.6rem" }}>
+                {detail.ingredients?.length > 0 && (
+                  <div>
+                    <h3 className="done-title" style={{ marginTop: "0.4rem" }}>📋 Zutaten</h3>
+                    <ul className="list">
+                      {detail.ingredients.map((ing, i) => <li key={i}><span>{ing}</span></li>)}
+                    </ul>
+                  </div>
+                )}
+                {detail.instructions?.length > 0 && (
+                  <div>
+                    <h3 className="done-title" style={{ marginTop: "0.5rem" }}>👨‍🍳 Anleitung</h3>
+                    <ol className="list" style={{ paddingLeft: "1.1rem" }}>
+                      {detail.instructions.map((st, i) => <li key={i}>{st}</li>)}
+                    </ol>
+                  </div>
+                )}
+              </div>
+            ) : (
+              !detail.fallback && <p className="muted" style={{ marginTop: "0.4rem" }}>Keine Zutaten/Anleitung extrahierbar.</p>
+            )}
+            <p style={{ marginTop: "0.7rem" }}>
+              <a href={detail.url} target="_blank" rel="noreferrer" className="btn-inline">🔗 Auf Chefkoch öffnen</a>
+              <button type="button" className="btn-inline" style={{ marginLeft: "0.4rem", background: wakeLockActive ? "rgba(42,157,143,0.9)" : "rgba(255,255,255,0.2)" }}
+                onClick={toggleWakeLock}>
+                {wakeLockActive ? "⏳ Display an (aktiv)" : "⏳ Display an lassen"}
+              </button>
+            </p>
           </section>
         )}
       </div>

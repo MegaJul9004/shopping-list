@@ -163,6 +163,16 @@ export function deleteItem({ itemId, familyId }) {
   return changed;
 }
 
+export function deleteDoneItems(familyId) {
+  const before = store.shoppingItems.length;
+  store.shoppingItems = store.shoppingItems.filter(
+    (item) => !(item.familyId === familyId && item.checked)
+  );
+  const changed = store.shoppingItems.length < before;
+  if (changed) persist();
+  return changed;
+}
+
 export function getRecurringItemsByFamily(familyId) {
   return store.recurringItems
     .filter((item) => item.familyId === familyId)
@@ -174,7 +184,23 @@ export function getRecurringItemsByFamily(familyId) {
     });
 }
 
-export function addRecurringItem({ id, familyId, name, quantity, dayOfWeek }) {
+export function addRecurringItem({ id, familyId, name, quantity, dayOfWeek, duplicateBehavior }) {
+  // Smart-Merge analog zur Einkaufsliste: bei "merge" identische Artikel am gleichen Tag kombinieren
+  const smart = duplicateBehavior === "merge";
+  if (smart) {
+    const norm = name.toLowerCase().replace(/ß/g, "ss").trim();
+    const existing = store.recurringItems.find(
+      (r) =>
+        r.familyId === familyId &&
+        r.dayOfWeek === dayOfWeek &&
+        r.name.toLowerCase().replace(/ß/g, "ss").trim() === norm
+    );
+    if (existing) {
+      existing.quantity = (existing.quantity || 1) + (quantity || 1);
+      persist();
+      return { merged: true, item: existing };
+    }
+  }
   store.recurringItems.push({
     id,
     familyId,
@@ -184,6 +210,7 @@ export function addRecurringItem({ id, familyId, name, quantity, dayOfWeek }) {
     createdAt: new Date().toISOString()
   });
   persist();
+  return { merged: false, item: store.recurringItems[store.recurringItems.length - 1] };
 }
 
 export function deleteRecurringItem({ itemId, familyId }) {
