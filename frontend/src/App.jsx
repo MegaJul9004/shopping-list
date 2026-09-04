@@ -842,6 +842,7 @@ export default function App() {
                 return (
                   <div
                     key={cardId}
+                    data-card-id={cardId}
                     className={"editor-card-wrap" + (editorMode ? " draggable" : "") + (freeEditor ? " free-draggable" : "") + (isDragOver ? " drag-over" : "")}
                     draggable={editorMode}
                     onDragStart={(e) => editorMode && handleDragStart(e, idx)}

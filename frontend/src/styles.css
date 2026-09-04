@@ -568,16 +568,24 @@ h3 {
   padding: 0;
   display: grid;
   gap: 0.4rem;
+  max-height: 320px;
+  overflow-y: auto;
 }
 
 .recurring-list li {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
   border: 1px solid #d8e3ea;
   border-radius: 12px;
   padding: 0.5rem 0.65rem;
   background: var(--card-inner);
+}
+
+.recurring-list li > span:first-child {
+  min-width: 0;
 }
 
 .muted {
@@ -781,6 +789,18 @@ h3 {
 
 .editor-allcards {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+/* Rezepte-Kachel über volle Breite: verhindert die verwaiste Zelle,
+   die die Karte weit nach unten drückt. */
+.editor-allcards .editor-card-wrap[data-card-id="recipes"] {
+  grid-column: 1 / -1;
+}
+
+/* In der Free-Editor-Positionierung ist die volle Breite unerwünscht,
+   da die Karte dort pixelgenau positioniert wird. */
+.free-canvas.free-active .editor-card-wrap[data-card-id="recipes"] {
+  grid-column: auto;
 }
 
 .editor-card-wrap {
