@@ -3,11 +3,13 @@ import { Link } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import NavBar from "../components/NavBar";
 
-// Bitte durch deine echte IBAN ersetzen (Beispielwerte):
-const IBAN = "DE00 1234 5678 9012 3456 78";
-const BIC = "DUMMYDEFFXXX";
-const BENEFICIARY = "Einkaufsliste Projekt";
-const PURPOSE = "Spende Einkaufsliste";
+// Spenden-Kontodaten kommen aus der Umgebungsvariable (frontend/.env).
+// Die .env ist per .gitignore ausgeschlossen und landet daher NICHT auf GitHub.
+// Fallback-Werte sind Platzhalter, falls keine .env gesetzt ist.
+const IBAN = import.meta.env.VITE_IBAN || "DE00 1234 5678 9012 3456 78";
+const BIC = import.meta.env.VITE_BIC || "DUMMYDEFFXXX";
+const BENEFICIARY = import.meta.env.VITE_BENEFICIARY || "Einkaufsliste Projekt";
+const PURPOSE = import.meta.env.VITE_PURPOSE || "Spende Einkaufsliste";
 
 export default function DonatePage() {
   const { session, setSession } = useApp();
