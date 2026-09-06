@@ -77,6 +77,17 @@ export default function SettingsPage() {
     setSaving(false);
   };
 
+  const handleAutoDeleteChange = async (hours) => {
+    updateSettings({ autoDeleteAfterHours: hours });
+    try {
+      await api(`/families/${session.familyId}/settings`, {
+        method: "POST",
+        body: JSON.stringify({ autoDeleteAfterHours: hours })
+      }, session.token);
+    } catch (e) { console.error(e); }
+  };
+
+
   const applyBranchResults = async () => {
     if (zipResults.length === 0) return;
     setZipSaving(true);
@@ -250,6 +261,17 @@ export default function SettingsPage() {
               <option value="separate">Separate Einträge</option>
             </select>
           </label>
+          <div className="settings-field">
+            <label>Erledigtes automatisch löschen nach</label>
+            <select value={Number(settings.autoDeleteAfterHours) || 0} onChange={(e) => handleAutoDeleteChange(Number(e.target.value))}>
+              <option value={0}>Aus</option>
+              <option value={24}>Nach 24 Stunden</option>
+              <option value={48}>Nach 48 Stunden</option>
+              <option value={168}>Nach 1 Woche</option>
+              <option value={336}>Nach 2 Wochen</option>
+              <option value={720}>Nach 1 Monat</option>
+            </select>
+          </div>
           {saving && <p className="muted">Speichere...</p>}
         </section>
 

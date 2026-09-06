@@ -36,11 +36,23 @@ function CardShopping(p) {
         <Link to="/settings">Einstellungen</Link>
       </div>
       {typeof p.updateSettings === "function" && (
-        <div className="family-chip" style={{ marginTop: "0.2rem" }}>
-          <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0 }}>
-            <input type="checkbox" checked={!!p.settings.autoDeleteDone}
-              onChange={(e) => p.updateSettings({ autoDeleteDone: e.target.checked })} />
-            <span className="muted" style={{ fontSize: "0.85rem" }}>{p.t ? p.t("list.autoDelete") : "Erledigtes automatisch löschen"}</span>
+        <div className="family-chip" style={{ marginTop: "0.2rem", flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0, flexWrap: "wrap" }}>
+            <span className="muted" style={{ fontSize: "0.85rem" }}>
+              {p.t ? p.t("list.autoDelete") : "Erledigtes automatisch löschen nach"}
+            </span>
+            <select
+              value={Number(p.settings.autoDeleteAfterHours) || 0}
+              onChange={(e) => p.onChangeAutoDelete && p.onChangeAutoDelete(Number(e.target.value))}
+              style={{ minWidth: "170px", width: "auto" }}
+            >
+              <option value={0}>Aus</option>
+              <option value={24}>Nach 24 Stunden</option>
+              <option value={48}>Nach 48 Stunden</option>
+              <option value={168}>Nach 1 Woche</option>
+              <option value={336}>Nach 2 Wochen</option>
+              <option value={720}>Nach 1 Monat</option>
+            </select>
           </label>
         </div>
       )}
@@ -254,90 +266,8 @@ export default function App() {
   const dragSrcIdx = useRef(-1);
   const [dragOverIdx, setDragOverIdx] = useState(-1);
 
-  // ── Free Editor Mode (pixelgenaues Positionieren + Skalieren) ─────────
-  const FREE_EDITOR_KEY = "shopping_free_editor";
-  const FREE_LAYOUT_KEY = "shopping_free_layout";
-  const [freeEditor, setFreeEditor] = useState(() => {
-    try { return localStorage.getItem(FREE_EDITOR_KEY) === "1"; } catch { return false; }
-  });
-  const [freeLayout, setFreeLayout] = useState(() => {
-    try {
-      const saved = localStorage.getItem(FREE_LAYOUT_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return {};
-  });
-  const freeDragId = useRef(null);
-  const freeDragMode = useRef(null); // "move" | "resize"
-  const freeStart = useRef({ x: 0, y: 0, lx: 0, ly: 0 });
-
-  useEffect(() => {
-    try { localStorage.setItem(FREE_EDITOR_KEY, freeEditor ? "1" : "0"); } catch {}
-  }, [freeEditor]);
-
-  useEffect(() => {
-    try { localStorage.setItem(FREE_LAYOUT_KEY, JSON.stringify(freeLayout)); } catch {}
-  }, [freeLayout]);
-
-  const freeCanvasRef = useRef(null);
-  const freeSetRect = (id, patch) => {
-    setFreeLayout((prev) => {
-      const base = prev[id] || { x: 0, y: 0, w: 320, h: 260 };
-      return { ...prev, [id]: { ...base, ...patch } };
-    });
-  };
-
-  const freeMoveStart = (e, id) => {
-    if (!freeEditor) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const canvas = freeCanvasRef.current?.getBoundingClientRect();
-    const base = freeLayout[id] || { x: rect.left - (canvas?.left || 0), y: rect.top - (canvas?.top || 0), w: rect.width, h: rect.height };
-    freeDragId.current = id;
-    freeDragMode.current = "move";
-    freeStart.current = { x: e.clientX, y: e.clientY, lx: base.x, ly: base.y };
-    setFreeLayout((prev) => ({ ...prev, [id]: base }));
-    window.addEventListener("pointermove", freeMove);
-    window.addEventListener("pointerup", freeEnd);
-  };
-
-  const freeResizeStart = (e, id) => {
-    if (!freeEditor) return;
-    e.stopPropagation();
-    const rect = e.currentTarget.parentElement.getBoundingClientRect();
-    const base = freeLayout[id] || { x: 0, y: 0, w: rect.width, h: rect.height };
-    freeDragId.current = id;
-    freeDragMode.current = "resize";
-    freeStart.current = { x: e.clientX, y: e.clientY, w: base.w, h: base.h };
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-
-  const freeMove = (e) => {
-    const id = freeDragId.current;
-    if (!id) return;
-    const canvas = freeCanvasRef.current?.getBoundingClientRect();
-    if (freeDragMode.current === "move") {
-      const dx = e.clientX - freeStart.current.x;
-      const dy = e.clientY - freeStart.current.y;
-      const nx = Math.max(0, Math.round(freeStart.current.lx + dx));
-      const ny = Math.max(0, Math.round(freeStart.current.ly + dy));
-      freeSetRect(id, { x: nx, y: ny });
-    } else if (freeDragMode.current === "resize") {
-      const dw = e.clientX - freeStart.current.x;
-      const dh = e.clientY - freeStart.current.y;
-      freeSetRect(id, { w: Math.max(180, Math.round(freeStart.current.w + dw)), h: Math.max(140, Math.round(freeStart.current.h + dh)) });
-    }
-  };
-
-  const freeEnd = () => {
-    freeDragId.current = null;
-    freeDragMode.current = null;
-    window.removeEventListener("pointermove", freeMove);
-    window.removeEventListener("pointerup", freeEnd);
-  };
-
-  const resetFreeLayout = () => {
-    setFreeLayout({});
-  };
+  // Hinweis: Der frühere Free-Editor-Modus wurde entfernt.
+  // Es gibt nur noch den normalen Drag-and-Drop-Editor zum Umsortieren.
 
   useEffect(() => {
     try { localStorage.setItem(EDITOR_STORAGE_KEY, editorMode ? "1" : "0"); } catch {}
@@ -426,13 +356,8 @@ export default function App() {
   const toggleItem = async (itemId, currentChecked) => {
     if (!session) return;
     const willCheck = !currentChecked;
-    // Option "Erledigtes automatisch löschen" an
-    if (willCheck && settings.autoDeleteDone) {
-      try {
-        await api(`/families/${session.familyId}/items/${itemId}`, { method: "DELETE" }, session.token);
-      } catch (e) { setError(e.message); }
-      return;
-    }
+    // Das automatische Löschen abgehakter Artikel erfolgt serverseitig
+    // zeitbasiert (autoDeleteAfterHours), daher nur den Status setzen.
     try {
       await api(`/families/${session.familyId}/items/${itemId}`, { method: "PATCH", body: JSON.stringify({ checked: willCheck }) }, session.token);
     } catch (e) { setError(e.message); }
@@ -541,6 +466,14 @@ export default function App() {
     } catch (e) { setError(e.message); }
   };
 
+  const handleAutoDeleteChange = async (hours) => {
+    if (!session) return;
+    updateSettings({ autoDeleteAfterHours: hours });
+    try {
+      await api(`/families/${session.familyId}/settings`, { method: "POST", body: JSON.stringify({ autoDeleteAfterHours: hours }) }, session.token);
+    } catch (e) { setError(e.message); }
+  };
+
   const resetCardOrder = () => {
     setCardOrder(DEFAULT_CARD_ORDER.slice());
   };
@@ -592,6 +525,7 @@ export default function App() {
     miniListItems, setMiniListItems,
     saveMiniList, deleteMiniList, addMiniListToShopping,
     addMiniListToRecurring, deleteDoneItems,
+    onChangeAutoDelete: handleAutoDeleteChange,
     startEditMiniList, editingMiniListId, setEditingMiniListId,
     recurringItems, recurName, setRecurName,
     recurQty, setRecurQty, recurDay, setRecurDay,
@@ -803,59 +737,29 @@ export default function App() {
                     ↺ Reihenfolge zurücksetzen
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="btn-inline"
-                  style={{
-                    background: freeEditor ? "rgba(42,157,143,0.9)" : "rgba(255,255,255,0.2)",
-                    border: freeEditor ? "2px solid #fff" : "none"
-                  }}
-                  onClick={() => setFreeEditor((v) => !v)}
-                  title="Free Editor: Karten frei positionieren und skalieren"
-                >
-                  {freeEditor ? "✅ Free verlassen" : "🎯 Free"}
-                </button>
-                {freeEditor && (
-                  <button type="button" className="btn-inline ghost-btn-inline" onClick={resetFreeLayout}>
-                    ↺ Layout zurücksetzen
-                  </button>
-                )}
               </div>
-              {freeEditor && (
-                <p style={{marginTop:"0.8rem",padding:"0.6rem 0.9rem",background:"rgba(255,255,255,0.18)",borderRadius:"10px",fontSize:"0.9rem"}}>
-                  🎯 Free-Modus: Karten per Ziehen frei platzieren und an der Ecke skalieren (pixelgenau).
-                </p>
-              )}
             </header>
             {error && <div className="error-banner">{error}</div>}
 
             <div
-              ref={freeCanvasRef}
-              className={"dashboard-grid editor-allcards free-canvas" + (freeEditor ? " free-active" : "") + (editorMode ? " editor-active" : "")}
+              className={"dashboard-grid editor-allcards" + (editorMode ? " editor-active" : "")}
             >
               {cardOrder.map((cardId, idx) => {
                 const Comp = CARD_COMPONENTS[cardId];
                 if (!Comp) return null;
                 const isDragOver = dragOverIdx === idx;
-                const fl = freeLayout[cardId];
-                const freeStyle = freeEditor && fl ? { position: "absolute", left: fl.x, top: fl.y, width: fl.w, height: fl.h } : {};
                 return (
                   <div
                     key={cardId}
                     data-card-id={cardId}
-                    className={"editor-card-wrap" + (editorMode ? " draggable" : "") + (freeEditor ? " free-draggable" : "") + (isDragOver ? " drag-over" : "")}
+                    className={"editor-card-wrap" + (editorMode ? " draggable" : "") + (isDragOver ? " drag-over" : "")}
                     draggable={editorMode}
                     onDragStart={(e) => editorMode && handleDragStart(e, idx)}
                     onDragOver={(e) => editorMode && handleDragOver(e, idx)}
                     onDragLeave={(e) => editorMode && handleDragLeave(e)}
                     onDrop={(e) => editorMode && handleDrop(e, idx)}
                     onDragEnd={handleDragEnd}
-                    onPointerDown={(e) => freeEditor && freeMoveStart(e, cardId)}
-                    style={freeStyle}
                   >
-                    {freeEditor && (
-                      <div className="free-resize-handle" onPointerDown={(e) => freeResizeStart(e, cardId)} title="Größe ändern" />
-                    )}
                     {editorMode && (
                       <div className="editor-drag-handle" title="Karte verschieben">
                         <span>⋮⋮</span>
@@ -868,6 +772,10 @@ export default function App() {
                 );
               })}
             </div>
+
+            <footer className="donate-footer">
+              <Link to="/spenden" className="btn-inline donate-btn">❤️ Spenden</Link>
+            </footer>
           </>
         )}
       </div>

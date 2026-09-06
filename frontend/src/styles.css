@@ -39,10 +39,22 @@ body {
   margin: 0;
   font-family: "Space Grotesk", sans-serif;
   color: var(--ink);
-  background: radial-gradient(circle at 10% 20%, #ffe8d6 0%, transparent 35%),
-    radial-gradient(circle at 90% 10%, #e9f5db 0%, transparent 30%),
-    linear-gradient(160deg, var(--bg-top), var(--bg-bottom));
+  background: linear-gradient(160deg, var(--bg-top), var(--bg-bottom));
+  background-attachment: fixed;
   min-height: 100vh;
+}
+
+/* Fester, nicht gestreckter Hintergrundverlauf (unabhängig von der Seitenhöhe).
+   Die Radial-Verläufe liegen fest im Viewport, dadurch bleibt das Bild stabil,
+   egal wie lang die Einkaufsliste wird. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(circle at 10% 20%, #ffe8d6 0%, transparent 35%),
+    radial-gradient(circle at 90% 10%, #e9f5db 0%, transparent 30%);
 }
 
 .page-shell {
@@ -797,11 +809,6 @@ h3 {
   grid-column: 1 / -1;
 }
 
-/* In der Free-Editor-Positionierung ist die volle Breite unerwünscht,
-   da die Karte dort pixelgenau positioniert wird. */
-.free-canvas.free-active .editor-card-wrap[data-card-id="recipes"] {
-  grid-column: auto;
-}
 
 .editor-card-wrap {
   position: relative;
@@ -929,7 +936,18 @@ h3 {
 }
 
 .done-item {
-  background: rgba(42, 157, 143, 0.06) !important;
+  background: rgba(42, 157, 143, 0.16) !important;
+  border: 1px solid rgba(42, 157, 143, 0.5) !important;
+}
+
+.done-item .item-name {
+  color: var(--ok);
+  text-decoration: line-through;
+}
+
+.done-item .item-qty {
+  background: rgba(42, 157, 143, 0.18);
+  color: var(--ok);
 }
 
 .done-item .item-name {
@@ -1014,45 +1032,6 @@ h3 {
   .hero { padding: 1.2rem; }
   .add-form input, .add-form select { min-width: 0; }
 }
-/* ── Free Editor Mode ──────────────────────────────────── */
-.free-canvas {
-  position: relative;
-}
-.free-canvas.free-active {
-  min-height: 900px;
-  border: 2px dashed rgba(42, 157, 143, 0.5);
-  border-radius: 18px;
-  padding: 12px;
-}
-.free-canvas.free-active .editor-card-wrap {
-  margin: 0;
-  position: absolute;
-  cursor: move;
-}
-.free-canvas.free-active .editor-card-wrap.free-draggable > section.card {
-  box-shadow: 0 0 0 2px rgba(42, 157, 143, 0.6), var(--shadow, 0 14px 38px rgba(31,42,55,0.14));
-}
-.free-resize-handle {
-  position: absolute;
-  right: 2px;
-  bottom: 2px;
-  width: 18px;
-  height: 18px;
-  cursor: nwse-resize;
-  background: rgba(42, 157, 143, 0.9);
-  border-radius: 4px;
-  z-index: 5;
-}
-.free-resize-handle::after {
-  content: "";
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  border-right: 2px solid #fff;
-  border-bottom: 2px solid #fff;
-  right: 4px;
-  bottom: 4px;
-}
 /* ── Auto-grow Eingabefelder ─────────────────────────── */
 .auto-grow {
   min-width: 0;
@@ -1072,4 +1051,66 @@ h3 {
   overflow-y: auto;
   margin-top: 0.6rem;
   scrollbar-width: thin;
+}
+
+/* ── Spenden-Seite ───────────────────────────────────────── */
+.donate-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.6rem;
+}
+
+.donate-btn {
+  background: rgba(239, 131, 84, 0.25);
+  padding: 0.5rem 1.1rem;
+  font-size: 1rem;
+}
+
+.donate-btn:hover {
+  background: rgba(239, 131, 84, 0.4);
+}
+
+.donate-card {
+  background: var(--card);
+  border: 1px solid #ffffffcc;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.4rem;
+  margin-top: 1.4rem;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.donate-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+.donate-table td {
+  padding: 0.6rem 0.7rem;
+  border: 1px solid #d8e3ea;
+  border-radius: 8px;
+  background: var(--card-inner);
+  vertical-align: top;
+}
+
+.donate-table td:first-child {
+  font-weight: 600;
+  width: 40%;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.donate-table td:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.donate-iban {
+  font-family: "Courier New", monospace;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  word-break: break-all;
 }

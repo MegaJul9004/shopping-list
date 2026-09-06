@@ -69,7 +69,7 @@ export function AppProvider({ children }) {
       currency: "EUR",
       numberFormat: "comma",
       weekStart: 1,
-      autoDeleteDone: false
+      autoDeleteAfterHours: 0
     };
   });
 

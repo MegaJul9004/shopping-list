@@ -6,6 +6,7 @@ import App from './App';
 import SettingsPage from './pages/SettingsPage';
 import OffersPage from './pages/OffersPage';
 import RecipesPage from './pages/RecipesPage';
+import DonatePage from './pages/DonatePage';
 import './styles.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -17,6 +18,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/offers" element={<OffersPage />} />
           <Route path="/rezepte" element={<RecipesPage />} />
+          <Route path="/spenden" element={<DonatePage />} />
           <Route path="*" element={<App />} />
         </Routes>
       </BrowserRouter>

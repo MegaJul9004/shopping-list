@@ -18,6 +18,7 @@ import {
   deleteMiniList,
   deleteRecurringItem,
   deleteDoneItems,
+  cleanupExpiredDoneItems,
   getFamilyBranchLocations,
   getFamilyById,
   getFamilyLocations,
@@ -83,6 +84,8 @@ io.on("connection", (socket) => {
 });
 
 function emitItems(familyId) {
+  const settings = getFamilySettings(familyId);
+  cleanupExpiredDoneItems(familyId, settings.autoDeleteAfterHours);
   const items = getItemsByFamily(familyId);
   io.to(familyId).emit("itemsSnapshot", items);
 }
@@ -263,6 +266,8 @@ app.get("/api/families/:familyId/list", authMiddleware, (req, res) => {
     return res.status(404).json({ error: "Family not found" });
   }
 
+  const settings = getFamilySettings(familyId);
+  cleanupExpiredDoneItems(familyId, settings.autoDeleteAfterHours);
   return res.json({ items: getItemsByFamily(familyId) });
 });
 
@@ -519,7 +524,8 @@ app.post("/api/families/:familyId/settings", authMiddleware, (req, res) => {
   }
   const updated = setFamilySettings({
     familyId,
-    duplicateBehavior: req.body?.duplicateBehavior
+    duplicateBehavior: req.body?.duplicateBehavior,
+    autoDeleteAfterHours: req.body?.autoDeleteAfterHours
   });
   return res.json({ settings: updated });
 });

@@ -137,11 +137,15 @@ export function updateItem({ itemId, familyId, name, quantity, checked }) {
   }
 
   const item = store.shoppingItems[index];
+  const isChecked = typeof checked === "boolean" ? checked : item.checked;
   const next = {
     ...item,
     name: name ?? item.name,
     quantity: quantity ?? item.quantity,
-    checked: typeof checked === "boolean" ? checked : item.checked
+    checked: isChecked,
+    checkedAt: isChecked
+      ? (item.checked ? item.checkedAt : new Date().toISOString())
+      : undefined
   };
 
   store.shoppingItems[index] = next;
@@ -168,6 +172,25 @@ export function deleteDoneItems(familyId) {
   store.shoppingItems = store.shoppingItems.filter(
     (item) => !(item.familyId === familyId && item.checked)
   );
+  const changed = store.shoppingItems.length < before;
+  if (changed) persist();
+  return changed;
+}
+
+// Löscht abgehakte Artikel, die länger als autoDeleteAfterHours abgehakt sind.
+// Artikel ohne checkedAt (Legacy) werden nie automatisch gelöscht.
+export function cleanupExpiredDoneItems(familyId, autoDeleteAfterHours = 0) {
+  const hours = Number(autoDeleteAfterHours) || 0;
+  if (hours <= 0) return false;
+  const cutoff = Date.now() - hours * 60 * 60 * 1000;
+  const before = store.shoppingItems.length;
+  store.shoppingItems = store.shoppingItems.filter((item) => {
+    if (item.familyId !== familyId) return true;
+    if (!item.checked) return true;
+    const at = item.checkedAt ? new Date(item.checkedAt).getTime() : NaN;
+    if (!Number.isFinite(at)) return true;
+    return at >= cutoff;
+  });
   const changed = store.shoppingItems.length < before;
   if (changed) persist();
   return changed;
@@ -308,15 +331,21 @@ export function deleteFamilyBranchLocation({ familyId, market }) {
 }
 export function getFamilySettings(familyId) {
   const entry = store.familySettings.find((s) => s.familyId === familyId);
-  return entry || { familyId, duplicateBehavior: "merge" };
+  if (entry) {
+    return { ...entry, autoDeleteAfterHours: Number(entry.autoDeleteAfterHours) || 0 };
+  }
+  return { familyId, duplicateBehavior: "merge", autoDeleteAfterHours: 0 };
 }
 
-export function setFamilySettings({ familyId, duplicateBehavior }) {
+export function setFamilySettings({ familyId, duplicateBehavior, autoDeleteAfterHours }) {
   const index = store.familySettings.findIndex((s) => s.familyId === familyId);
+  const existing = index >= 0 ? store.familySettings[index] : {};
   const payload = {
     familyId,
-    duplicateBehavior: duplicateBehavior === "separate" ? "separate" : "merge"
+    duplicateBehavior: duplicateBehavior === "separate" ? "separate" : (existing.duplicateBehavior || "merge"),
+    autoDeleteAfterHours: Number.isFinite(Number(autoDeleteAfterHours)) && Number(autoDeleteAfterHours) > 0 ? Math.floor(Number(autoDeleteAfterHours)) : 0
   };
+
 
   if (index >= 0) {
     store.familySettings[index] = payload;
