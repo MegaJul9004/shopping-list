@@ -17,7 +17,6 @@ function formatIban(v) {
   const c = cleanIban(v);
   return c ? c.replace(/(.{4})/g, "$1 ").trim() : "";
 }
->>>>>>> 67fa449f4148c36ca738aeb4440d32e3e6bf9cf4
 
 export default function DonatePage() {
   const { session, setSession } = useApp();
