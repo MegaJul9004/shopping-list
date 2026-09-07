@@ -40,7 +40,14 @@ import {
   getSavedRecipe,
   addSavedRecipe,
   updateSavedRecipe,
-  deleteSavedRecipe
+  deleteSavedRecipe,
+  getUserNumbers,
+  getAllUsers,
+  getUsersByFamily,
+  setFamilyRole,
+  removeUserFromFamily,
+  getAppConfig,
+  setSponsorInfo
 } from "./db.js";
 import { buildExportByMarket, compareMarkets } from "./offers.js";
 import {
@@ -51,9 +58,24 @@ import {
 } from "./liveOffers.js";
 import { searchChefkoch, getRecipeDetail } from "./recipeSearch.js";
 import { fetchStoreOffers } from "./services/offersService.js";
+import {
+  ROLE_ORDER,
+  ROLE_LABELS,
+  getUserRole,
+  getAllRoles,
+  assignRole
+} from "./roles.js";
+import fs from "node:fs";
+import path from "node:path";
+import { randomBytes } from "node:crypto";
 
 const familyCode = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 6);
-const jwtSecret = process.env.JWT_SECRET || "dev-secret-change-me-in-production";
+// Persistenter JWT-Secret: Aus env lesen, sonst einmalig in backend/.jwt-secret
+// (gitignored) ablegen, damit Tokens Backend-Neustarts ueberleben.
+const jwtSecretFile = path.resolve(process.cwd(), ".jwt-secret");
+const jwtSecret = process.env.JWT_SECRET
+  || (fs.existsSync(jwtSecretFile) ? fs.readFileSync(jwtSecretFile, "utf8").trim() : null)
+  || (fs.writeFileSync(jwtSecretFile, "sl-" + randomBytes(32).toString("hex"), "utf8"), fs.readFileSync(jwtSecretFile, "utf8").trim());
 
 const app = express();
 const server = http.createServer(app);
@@ -112,11 +134,15 @@ app.get("/api/branches/search", (req, res) => {
 });
 
 function issueToken(user) {
+  const role = getUserRole(user.username, user.userNumber);
   return jwt.sign(
     {
       userId: user.id,
       familyId: user.familyId,
-      username: user.username
+      username: user.username,
+      userNumber: user.userNumber,
+      familyRole: user.familyRole || "member",
+      role
     },
     jwtSecret,
     { expiresIn: "30d" }
@@ -138,6 +164,30 @@ function authMiddleware(req, res, next) {
   } catch {
     return res.status(401).json({ error: "Invalid or expired token" });
   }
+}
+
+// Globaler Rollen-Check (Owner/Entwickler/Admin/...). Rolle wird frisch aus den
+// Rollen-Dateien gelesen, damit Aenderungen sofort wirken.
+function requireRole(...allowed) {
+  return (req, res, next) => {
+    const role = getUserRole(req.auth?.username, req.auth?.userNumber);
+    if (!allowed.includes(role)) {
+      return res.status(403).json({ error: "Insufficient rights" });
+    }
+    req.auth.role = role;
+    return next();
+  };
+}
+
+// Familien-Rollen-Check (admin/viceadmin/member)
+function requireFamilyRole(...allowed) {
+  return (req, res, next) => {
+    const familyRole = req.auth?.familyRole || "member";
+    if (!allowed.includes(familyRole)) {
+      return res.status(403).json({ error: "Not allowed for this family role" });
+    }
+    return next();
+  };
 }
 
 app.post("/api/auth/register", async (req, res) => {
@@ -187,16 +237,19 @@ app.post("/api/auth/register", async (req, res) => {
 
   const userId = nanoid(12);
   const passwordHash = await bcrypt.hash(password, 10);
-  createUser({ id: userId, familyId, username, passwordHash });
-
-  const token = issueToken({ id: userId, familyId, username });
+  const familyRole = mode === "create" ? "admin" : "member";
+  const createdUser = createUser({ id: userId, familyId, username, passwordHash, familyRole });
+  const token = issueToken(createdUser);
   return res.status(201).json({
     token,
     user: {
       id: userId,
       username,
+      userNumber: createdUser.userNumber,
       familyId,
-      familyName: family.name
+      familyName: family.name,
+      familyRole,
+      role: "user"
     }
   });
 });
@@ -231,8 +284,11 @@ app.post("/api/auth/login", async (req, res) => {
     user: {
       id: user.id,
       username: user.username,
+      userNumber: user.userNumber,
       familyId,
-      familyName: family.name
+      familyName: family.name,
+      familyRole: user.familyRole || "member",
+      role: getUserRole(user.username, user.userNumber)
     }
   });
 });
@@ -245,14 +301,131 @@ app.get("/api/auth/me", authMiddleware, (req, res) => {
     return res.status(401).json({ error: "Session no longer valid" });
   }
 
+  const role = getUserRole(user.username, user.userNumber);
   return res.json({
     user: {
       id: user.id,
       username: user.username,
+      userNumber: user.userNumber,
       familyId: user.familyId,
-      familyName: family.name
+      familyName: family.name,
+      familyRole: user.familyRole || "member",
+      role
     }
   });
+});
+
+// ——— Familien-Mitglieder & Rollen ————————————————————————————————
+app.get("/api/families/:familyId/members", authMiddleware, requireFamilyRole("admin", "viceadmin"), (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed for this family" });
+  }
+  return res.json({ members: getUsersByFamily(familyId) });
+});
+
+// Vizeadmin ernennen (nur Familien-Admin)
+app.post("/api/families/:familyId/members/:userId/viceadmin", authMiddleware, requireFamilyRole("admin"), (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed for this family" });
+  }
+  const targetId = String(req.params.userId || "");
+  const target = getUsersByFamily(familyId).find((m) => m.id === targetId);
+  if (!target) {
+    return res.status(404).json({ error: "Member not found" });
+  }
+  setFamilyRole(targetId, "viceadmin");
+  return res.json({ ok: true });
+});
+
+// Mitglied entfernen (nur Familien-Admin; nicht sich selbst)
+app.delete("/api/families/:familyId/members/:userId", authMiddleware, requireFamilyRole("admin"), (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed for this family" });
+  }
+  const targetId = String(req.params.userId || "");
+  if (targetId === req.auth.userId) {
+    return res.status(400).json({ error: "Admin cannot remove self" });
+  }
+  const members = getUsersByFamily(familyId);
+  const target = members.find((m) => m.id === targetId);
+  if (!target) {
+    return res.status(404).json({ error: "Member not found" });
+  }
+  // Der letzte Vizeadmin darf nicht entfernt werden, sonst haette der Admin
+  // beim Verlassen keinen Nachfolger mehr.
+  if (target.familyRole === "viceadmin") {
+    const viceCount = members.filter((m) => m.familyRole === "viceadmin").length;
+    if (viceCount <= 1) {
+      return res.status(400).json({ error: "Der letzte Vizeadmin kann nicht entfernt werden" });
+    }
+  }
+  removeUserFromFamily(targetId);
+  return res.json({ ok: true });
+});
+
+// Familie verlassen
+app.post("/api/families/:familyId/leave", authMiddleware, (req, res) => {
+  const familyId = String(req.params.familyId || "").toUpperCase();
+  if (req.auth.familyId !== familyId) {
+    return res.status(403).json({ error: "Not allowed for this family" });
+  }
+  const me = getUsersByFamily(familyId).find((m) => m.id === req.auth.userId);
+  if (!me) return res.status(404).json({ error: "User not found" });
+
+  if (me.familyRole === "admin") {
+    // Nur verlassen, wenn ein Vizeadmin existiert, der uebernimmt.
+    const vice = getUsersByFamily(familyId).find((m) => m.familyRole === "viceadmin");
+    if (!vice) {
+      return res.status(400).json({ error: "Es gibt keinen Vizeadmin. Du kannst die Familie nicht verlassen." });
+    }
+    setFamilyRole(vice.id, "admin");
+  }
+  removeUserFromFamily(req.auth.userId);
+  return res.json({ ok: true });
+});
+
+// ——— Spenden-Config (IBAN) ————————————————————————————————
+app.get("/api/sponsor", (_req, res) => {
+  const cfg = getAppConfig();
+  return res.json({ sponsor: cfg.sponsor || {} });
+});
+
+// Nur Entwickler/Admin/Owner duerfen die Spenden-IBAN aendern
+app.post("/api/admin/sponsor", authMiddleware, requireRole("owner", "developer", "admin"), (req, res) => {
+  const updated = setSponsorInfo({
+    iban: req.body?.iban,
+    bic: req.body?.bic,
+    beneficiary: req.body?.beneficiary,
+    purpose: req.body?.purpose
+  });
+  return res.json({ sponsor: updated });
+});
+
+// ——— Globale Rollen-Verwaltung (nur Owner) ————————————————————
+app.get("/api/admin/roles", authMiddleware, requireRole("owner"), (req, res) => {
+  return res.json({
+    roles: getAllRoles(),
+    labels: ROLE_LABELS,
+    users: getAllUsers()
+  });
+});
+
+app.post("/api/admin/roles/assign", authMiddleware, requireRole("owner"), (req, res) => {
+  const username = String(req.body?.username || "").trim().toLowerCase();
+  const userNumber = Number(req.body?.userNumber);
+  const role = String(req.body?.role || "").toLowerCase();
+  if (!username || !Number.isFinite(userNumber) || !ROLE_ORDER.includes(role)) {
+    return res.status(400).json({ error: "username, userNumber and a valid role are required" });
+  }
+  try {
+    assignRole({ username, userNumber, role });
+    return res.json({ ok: true, role });
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
 });
 
 app.get("/api/families/:familyId/list", authMiddleware, (req, res) => {

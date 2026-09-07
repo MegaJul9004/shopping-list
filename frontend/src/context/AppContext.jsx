@@ -88,6 +88,37 @@ export function AppProvider({ children }) {
     };
   });
 
+  // Session beim App-Start revalidieren, sodass man nach Updates/Reloads
+  // eingeloggt bleibt (solange das JWT gueltig ist). Einmalig nach dem Mount.
+  useEffect(() => {
+    const saved = localStorage.getItem("shopping_session");
+    if (!saved) return;
+    let cancelled = false;
+    let savedToken = null;
+    try { savedToken = JSON.parse(saved)?.token || null; } catch {}
+    api("/auth/me", {}, savedToken)
+      .then((data) => {
+        if (cancelled || !data.user) return;
+        setSession({
+          token: savedToken,
+          id: data.user.id,
+          username: data.user.username,
+          userNumber: data.user.userNumber,
+          familyId: data.user.familyId,
+          familyName: data.user.familyName,
+          familyRole: data.user.familyRole || "member",
+          role: data.user.role || "user"
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          localStorage.removeItem("shopping_session");
+          setSession(null);
+        }
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   // Persist editor mode changes
   useEffect(() => {
     try {
