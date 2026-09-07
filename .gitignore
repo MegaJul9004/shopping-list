@@ -1,4 +1,4 @@
-node_modules/
+﻿node_modules/
 backend/node_modules/
 frontend/node_modules/
 backend/data/*.db
@@ -6,3 +6,6 @@ backend/data/*.db
 .DS_Store
 frontend/dist/
 dist/
+backend/.jwt-secret
+backend/roles/
+

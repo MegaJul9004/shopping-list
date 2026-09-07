@@ -144,6 +144,71 @@ export default function SettingsPage() {
     } catch (e) { setBranchMessage(`Fehler: ${e.message}`); }
   };
 
+  // ——— Familie & Rollen ———
+  const [members, setMembers] = useState([]);
+  const [memberMsg, setMemberMsg] = useState("");
+  const [rolesData, setRolesData] = useState(null);
+  const [roleMsg, setRoleMsg] = useState("");
+
+  const loadMembers = useCallback(async () => {
+    if (!session) return;
+    try {
+      const data = await api(`/families/${session.familyId}/members`, {}, session.token);
+      setMembers(data.members || []);
+    } catch {}
+  }, [session]);
+
+  useEffect(() => { loadMembers(); }, [loadMembers]);
+
+  const makeViceAdmin = async (userId) => {
+    setMemberMsg("");
+    try {
+      await api(`/families/${session.familyId}/members/${userId}/viceadmin`, { method: "POST", body: JSON.stringify({}) }, session.token);
+      setMemberMsg("✓ Vizeadmin ernannt");
+      loadMembers();
+    } catch (e) { setMemberMsg("Fehler: " + e.message); }
+  };
+
+  const removeMember = async (userId) => {
+    setMemberMsg("");
+    if (!window.confirm("Dieses Mitglied wirklich aus der Familie entfernen?")) return;
+    try {
+      await api(`/families/${session.familyId}/members/${userId}`, { method: "DELETE" }, session.token);
+      setMemberMsg("✓ Mitglied entfernt");
+      loadMembers();
+    } catch (e) { setMemberMsg("Fehler: " + e.message); }
+  };
+
+  const leaveFamily = async () => {
+    setMemberMsg("");
+    if (!window.confirm("Wirklich aus der Familie austreten?")) return;
+    try {
+      await api(`/families/${session.familyId}/leave`, { method: "POST", body: JSON.stringify({}) }, session.token);
+      localStorage.removeItem("shopping_session");
+      setSession(null);
+      window.location.href = "/";
+    } catch (e) { setMemberMsg("Fehler: " + e.message); }
+  };
+
+  // Rollen-Verwaltung (nur Owner)
+  const isOwner = (session?.role || "user") === "owner";
+  const loadRoles = async () => {
+    try {
+      const data = await api("/admin/roles", {}, session.token);
+      setRolesData(data);
+      setRoleMsg("");
+    } catch (e) { setRoleMsg("Keine Berechtigung: " + e.message); }
+  };
+
+  const assignRole = async (username, userNumber, role) => {
+    setRoleMsg("");
+    try {
+      await api("/admin/roles/assign", { method: "POST", body: JSON.stringify({ username, userNumber, role }) }, session.token);
+      setRoleMsg("✓ Rolle zugewiesen");
+      loadRoles();
+    } catch (e) { setRoleMsg("Fehler: " + e.message); }
+  };
+
   return (
     <div className="page-shell">
       <NavBar theme={theme} session={session} onLogout={() => {
@@ -274,6 +339,69 @@ export default function SettingsPage() {
           </div>
           {saving && <p className="muted">Speichere...</p>}
         </section>
+
+        <section className="card" style={{ gridColumn: "1 / -1" }}>
+          <h2>👨‍👩‍👧 Familie & Rollen</h2>
+          <p className="muted">Du bist {session?.familyRole === "admin" ? "Familien-Admin" : session?.familyRole === "viceadmin" ? "Vizeadmin" : "Mitglied"}. Nutzernummer: <strong>{session?.userNumber}</strong> (nicht änderbar) · Globale Rolle: <strong>{session?.role || "user"}</strong></p>
+
+          {members.length === 0 ? (
+            <p className="muted">Keine Mitglieder geladen.</p>
+          ) : (
+            <ul className="recurring-list">
+              {members.map((m) => (
+                <li key={m.id}>
+                  <div>
+                    <strong>{m.username}</strong>
+                    <span className="muted"> · #{m.userNumber}</span>
+                    {m.familyRole === "admin" && <span className="item-qty" style={{ marginLeft: "0.4rem" }}>Admin</span>}
+                    {m.familyRole === "viceadmin" && <span className="item-qty" style={{ marginLeft: "0.4rem" }}>Vizeadmin</span>}
+                  </div>
+                  {session?.familyRole === "admin" && m.familyRole === "member" && m.id !== session.id && (
+                    <div className="item-actions">
+                      <button className="ghost" onClick={() => makeViceAdmin(m.id)}>Vizeadmin</button>
+                      <button className="danger" onClick={() => removeMember(m.id)}>Entfernen</button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {memberMsg && <p className="muted" style={{ color: memberMsg.includes("Fehler") ? "var(--danger)" : "var(--ok)" }}>{memberMsg}</p>}
+          <button className="danger" style={{ marginTop: "0.5rem" }} onClick={leaveFamily}>Aus Familie austreten</button>
+        </section>
+
+        {isOwner && (
+        <section className="card" style={{ gridColumn: "1 / -1" }}>
+          <h2>🛡️ Rollen-Verwaltung (Owner)</h2>
+          <p className="muted">Weise Nutzern globale Rollen zu (Owner/Entwickler/Admin/Unterstützer/Benutzer).</p>
+          <button type="button" className="ghost" onClick={() => (rolesData ? setRolesData(null) : loadRoles())}>
+            {rolesData ? "Ausblenden" : "Rollen & Nutzer laden"}
+          </button>
+          {roleMsg && <p className="muted">{roleMsg}</p>}
+          {rolesData && (
+            <div style={{ marginTop: "0.6rem" }}>
+              {rolesData.users && rolesData.users.length === 0 && <p className="muted">Noch keine Nutzer.</p>}
+              <ul className="recurring-list">
+                {(rolesData.users || []).map((u) => (
+                  <li key={u.id}>
+                    <div><strong>{u.username}</strong><span className="muted"> · #{u.userNumber}</span></div>
+                    <select
+                      defaultValue=""
+                      onChange={(e) => { if (e.target.value) assignRole(u.username, u.userNumber, e.target.value); }}
+                      style={{ width: "auto", minWidth: "140px" }}
+                    >
+                      <option value="" disabled>Rolle →</option>
+                      {["owner", "developer", "admin", "supporter", "user"].map((r) => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+        )}
 
         <section className="card" style={{ gridColumn: "1 / -1" }}>
           <h2>🏪 Filialen (LIDL, EDEKA, ALDI, REWE)</h2>

@@ -18,7 +18,16 @@ function defaultStore() {
     familySettings: [],
     miniLists: [],
     offerWatchlist: [],
-    savedRecipes: []
+    savedRecipes: [],
+    nextUserNumber: 1,
+    appConfig: {
+      sponsor: {
+        iban: "",
+        bic: "",
+        beneficiary: "",
+        purpose: ""
+      }
+    }
   };
 }
 
@@ -45,7 +54,9 @@ function loadStore() {
       familySettings: Array.isArray(parsed.familySettings) ? parsed.familySettings : [],
       miniLists: Array.isArray(parsed.miniLists) ? parsed.miniLists : [],
       offerWatchlist: Array.isArray(parsed.offerWatchlist) ? parsed.offerWatchlist : [],
-      savedRecipes: Array.isArray(parsed.savedRecipes) ? parsed.savedRecipes : []
+      savedRecipes: Array.isArray(parsed.savedRecipes) ? parsed.savedRecipes : [],
+      nextUserNumber: Number.isFinite(Number(parsed.nextUserNumber)) ? Number(parsed.nextUserNumber) : 1,
+      appConfig: parsed.appConfig && typeof parsed.appConfig === "object" ? parsed.appConfig : { sponsor: { iban: "", bic: "", beneficiary: "", purpose: "" } }
     };
   } catch {
     return defaultStore();
@@ -71,15 +82,20 @@ export function createFamily({ id, name }) {
   persist();
 }
 
-export function createUser({ id, familyId, username, passwordHash }) {
+export function createUser({ id, familyId, username, passwordHash, familyRole = "member" }) {
+  const userNumber = store.nextUserNumber || 1;
+  store.nextUserNumber = userNumber + 1;
   store.users.push({
     id,
     familyId,
     username,
+    userNumber,
     passwordHash,
+    familyRole,
     createdAt: new Date().toISOString()
   });
   persist();
+  return { id, familyId, username, userNumber, familyRole };
 }
 
 export function getUserByFamilyAndUsername(familyId, username) {
@@ -100,8 +116,57 @@ export function getUserById(userId) {
     id: user.id,
     familyId: user.familyId,
     username: user.username,
+    userNumber: user.userNumber,
+    familyRole: user.familyRole || "member",
     createdAt: user.createdAt
   };
+}
+
+export function getUserNumbers() {
+  return store.users.map((u) => ({ username: u.username, userNumber: u.userNumber }));
+}
+
+export function getAllUsers() {
+  return store.users.map((u) => ({
+    id: u.id,
+    familyId: u.familyId,
+    username: u.username,
+    userNumber: u.userNumber,
+    familyRole: u.familyRole || "member"
+  }));
+}
+
+export function getUsersByFamily(familyId) {
+  return store.users
+    .filter((u) => u.familyId === familyId)
+    .map((u) => ({
+      id: u.id,
+      username: u.username,
+      userNumber: u.userNumber,
+      familyRole: u.familyRole || "member",
+      createdAt: u.createdAt
+    }));
+}
+
+export function getUserByNumber(userNumber) {
+  return store.users.find((u) => u.userNumber === Number(userNumber)) || null;
+}
+
+export function setFamilyRole(userId, role) {
+  const idx = store.users.findIndex((u) => u.id === userId);
+  if (idx < 0) return null;
+  store.users[idx].familyRole = role;
+  persist();
+  return store.users[idx];
+}
+
+// Entfernt einen Nutzer samt seiner zugehoerigen Eintraege aus der Familie
+export function removeUserFromFamily(userId) {
+  const before = store.users.length;
+  store.users = store.users.filter((u) => u.id !== userId);
+  const changed = store.users.length < before;
+  if (changed) persist();
+  return changed;
 }
 
 export function getItemsByFamily(familyId) {
@@ -508,6 +573,24 @@ export function removeFromOfferWatchlist({ watchId, familyId }) {
   const changed = store.offerWatchlist.length < before;
   if (changed) persist();
   return changed;
+}
+
+// -- App Config / Spenden -----------------------------
+export function getAppConfig() {
+  return store.appConfig || { sponsor: { iban: "", bic: "", beneficiary: "", purpose: "" } };
+}
+
+export function setSponsorInfo({ iban, bic, beneficiary, purpose }) {
+  const cfg = store.appConfig || { sponsor: {} };
+  cfg.sponsor = {
+    iban: iban ?? cfg.sponsor?.iban ?? "",
+    bic: bic ?? cfg.sponsor?.bic ?? "",
+    beneficiary: beneficiary ?? cfg.sponsor?.beneficiary ?? "",
+    purpose: purpose ?? cfg.sponsor?.purpose ?? ""
+  };
+  store.appConfig = cfg;
+  persist();
+  return cfg.sponsor;
 }
 
 // -- Branch search -------------------------------------
