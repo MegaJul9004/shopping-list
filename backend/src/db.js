@@ -92,6 +92,9 @@ export function createUser({ id, familyId, username, passwordHash, familyRole = 
     userNumber,
     passwordHash,
     familyRole,
+    prefs: {
+      showAddedBy: false
+    },
     createdAt: new Date().toISOString()
   });
   persist();
@@ -118,6 +121,7 @@ export function getUserById(userId) {
     username: user.username,
     userNumber: user.userNumber,
     familyRole: user.familyRole || "member",
+    prefs: user.prefs || { showAddedBy: false },
     createdAt: user.createdAt
   };
 }
@@ -152,6 +156,22 @@ export function getUserByNumber(userNumber) {
   return store.users.find((u) => u.userNumber === Number(userNumber)) || null;
 }
 
+export function getUserPrefs(userId) {
+  const u = store.users.find((e) => e.id === userId);
+  if (!u) return null;
+  return u.prefs || { showAddedBy: false };
+}
+
+export function setUserPrefs(userId, prefs) {
+  const u = store.users.find((e) => e.id === userId);
+  if (!u) return null;
+  u.prefs = {
+    showAddedBy: typeof prefs?.showAddedBy === "boolean" ? prefs.showAddedBy : (u.prefs?.showAddedBy || false)
+  };
+  persist();
+  return u.prefs;
+}
+
 export function setFamilyRole(userId, role) {
   const idx = store.users.findIndex((u) => u.id === userId);
   if (idx < 0) return null;
@@ -180,13 +200,14 @@ export function getItemsByFamily(familyId) {
     });
 }
 
-export function addItem({ id, familyId, name, quantity }) {
+export function addItem({ id, familyId, name, quantity, addedBy }) {
   store.shoppingItems.push({
     id,
     familyId,
     name,
     quantity,
     checked: false,
+    addedBy: addedBy || null,
     createdAt: new Date().toISOString()
   });
   persist();
@@ -423,7 +444,7 @@ export function setFamilySettings({ familyId, duplicateBehavior, autoDeleteAfter
 }
 
 // ── Smart Add Item (mit Duplikat-Erkennung) ─────────────────────────
-export function smartAddItem({ id, familyId, name, quantity, duplicateBehavior }) {
+export function smartAddItem({ id, familyId, name, quantity, duplicateBehavior, addedBy }) {
   const normalized = name.toLowerCase().replace(/ß/g, "ss").trim();
 
   const existing = store.shoppingItems.find(
@@ -445,6 +466,7 @@ export function smartAddItem({ id, familyId, name, quantity, duplicateBehavior }
     name,
     quantity,
     checked: false,
+    addedBy: addedBy || null,
     createdAt: new Date().toISOString()
   });
   persist();

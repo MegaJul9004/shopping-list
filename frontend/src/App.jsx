@@ -78,6 +78,9 @@ function CardShopping(p) {
               <span className="item-name">{item.name}</span>
               <span className="item-qty">{item.quantity}x</span>
             </label>
+            {p.prefs?.showAddedBy && item.addedBy && (
+              <span className="muted" style={{ fontSize: "0.75rem", display: "block", marginTop: "0.15rem" }}>➕ von {item.addedBy}</span>
+            )}
             <div className="item-actions">
               <button className="ghost" onClick={() => { p.setItemName(item.name); p.setItemQty(String(item.quantity)); p.deleteItem(item.id); }}>Bearbeiten</button>
               <button className="danger" onClick={() => p.deleteItem(item.id)}>Löschen</button>
@@ -515,6 +518,8 @@ export default function App() {
     cardOrder,
     settings,
     updateSettings,
+    prefs,
+    session,
     t,
     itemName, setItemName,
     itemQty, setItemQty,
@@ -720,6 +725,7 @@ export default function App() {
                 <Link to="/settings" className="btn-inline">⚙️ Einstellungen</Link>
                 <Link to="/offers" className="btn-inline">🏷️ Angebote</Link>
                 <Link to="/rezepte" className="btn-inline">🍳 Rezepte</Link>
+                <Link to="/familie" className="btn-inline">👨‍👩‍👧 Familie</Link>
                 <button
                   type="button"
                   className="btn-inline"

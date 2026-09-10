@@ -22,7 +22,7 @@ const CARD_FONTS = [
 ];
 
 export default function SettingsPage() {
-  const { session, settings, updateSettings, theme, updateTheme, resetTheme, t } = useApp();
+  const { session, settings, updateSettings, familySettings, updateFamilySettings, prefs, setMyPref, theme, updateTheme, resetTheme, t } = useApp();
   const [showTheme, setShowTheme] = useState(false);
   const [saving, setSaving] = useState(false);
   const [branches, setBranches] = useState({});
@@ -67,23 +67,15 @@ export default function SettingsPage() {
 
   const handleDuplicateChange = async (behavior) => {
     setSaving(true);
-    await updateSettings({ duplicateBehavior: behavior });
     try {
-      await api(`/families/${session.familyId}/settings`, {
-        method: "POST",
-        body: JSON.stringify({ duplicateBehavior: behavior })
-      }, session.token);
+      await updateFamilySettings({ duplicateBehavior: behavior });
     } catch (e) { console.error(e); }
     setSaving(false);
   };
 
   const handleAutoDeleteChange = async (hours) => {
-    updateSettings({ autoDeleteAfterHours: hours });
     try {
-      await api(`/families/${session.familyId}/settings`, {
-        method: "POST",
-        body: JSON.stringify({ autoDeleteAfterHours: hours })
-      }, session.token);
+      await updateFamilySettings({ autoDeleteAfterHours: hours });
     } catch (e) { console.error(e); }
   };
 
@@ -319,25 +311,40 @@ export default function SettingsPage() {
         </section>
 
         <section className="card">
-          <h2>🧠 Smart-Liste</h2>
-          <label>Duplikat-Verhalten
-            <select value={settings.duplicateBehavior} onChange={(e) => handleDuplicateChange(e.target.value)} disabled={saving}>
-              <option value="merge">Mengen zusammenführen</option>
-              <option value="separate">Separate Einträge</option>
-            </select>
+          <h2>🧠 Smart-Liste (Familie)</h2>
+          <p className="muted">Diese Einstellungen gelten für die gesamte Familie. Nur der Familien-Admin kann sie ändern.</p>
+          {session?.familyRole === "admin" ? (
+            <>
+              <label>Duplikat-Verhalten
+                <select value={familySettings.duplicateBehavior} onChange={(e) => handleDuplicateChange(e.target.value)} disabled={saving}>
+                  <option value="merge">Mengen zusammenführen</option>
+                  <option value="separate">Separate Einträge</option>
+                </select>
+              </label>
+              <div className="settings-field">
+                <label>Erledigtes automatisch löschen nach</label>
+                <select value={Number(familySettings.autoDeleteAfterHours) || 0} onChange={(e) => handleAutoDeleteChange(Number(e.target.value))}>
+                  <option value={0}>Aus</option>
+                  <option value={24}>Nach 24 Stunden</option>
+                  <option value={48}>Nach 48 Stunden</option>
+                  <option value={168}>Nach 1 Woche</option>
+                  <option value={336}>Nach 2 Wochen</option>
+                  <option value={720}>Nach 1 Monat</option>
+                </select>
+              </div>
+              {saving && <p className="muted">Speichere...</p>}
+            </>
+          ) : (
+            <div className="settings-field">
+              <span className="muted">Duplikat-Verhalten: <strong>{familySettings.duplicateBehavior === "separate" ? "Separate Einträge" : "Mengen zusammenführen"}</strong> (nur Admin änderbar)</span>
+              <span className="muted">Erledigtes automatisch löschen: <strong>{Number(familySettings.autoDeleteAfterHours) || 0}h</strong></span>
+            </div>
+          )}
+          <hr style={{ margin: "0.7rem 0" }} />
+          <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <input type="checkbox" checked={!!prefs?.showAddedBy} onChange={(e) => setMyPref("showAddedBy", e.target.checked)} />
+            <span className="muted">Anzeigen, wer Artikel zur Einkaufsliste hinzugefügt hat (nur für mich)</span>
           </label>
-          <div className="settings-field">
-            <label>Erledigtes automatisch löschen nach</label>
-            <select value={Number(settings.autoDeleteAfterHours) || 0} onChange={(e) => handleAutoDeleteChange(Number(e.target.value))}>
-              <option value={0}>Aus</option>
-              <option value={24}>Nach 24 Stunden</option>
-              <option value={48}>Nach 48 Stunden</option>
-              <option value={168}>Nach 1 Woche</option>
-              <option value={336}>Nach 2 Wochen</option>
-              <option value={720}>Nach 1 Monat</option>
-            </select>
-          </div>
-          {saving && <p className="muted">Speichere...</p>}
         </section>
 
         <section className="card" style={{ gridColumn: "1 / -1" }}>

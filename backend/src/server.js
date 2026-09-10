@@ -47,7 +47,9 @@ import {
   setFamilyRole,
   removeUserFromFamily,
   getAppConfig,
-  setSponsorInfo
+  setSponsorInfo,
+  getUserPrefs,
+  setUserPrefs
 } from "./db.js";
 import { buildExportByMarket, compareMarkets } from "./offers.js";
 import {
@@ -120,6 +122,10 @@ function emitRecurring(familyId) {
 function emitMiniLists(familyId) {
   const miniLists = getMiniLists(familyId);
   io.to(familyId).emit("miniListsSnapshot", miniLists);
+}
+
+function emitSettings(familyId) {
+  io.to(familyId).emit("settingsSnapshot", getFamilySettings(familyId));
 }
 
 app.get("/api/branches/search", (req, res) => {
@@ -428,6 +434,19 @@ app.post("/api/admin/roles/assign", authMiddleware, requireRole("owner"), (req, 
   }
 });
 
+// Persoenliche Einstellungen (pro Nutzer, gilt fuer eigene Konten)
+app.get("/api/users/me/prefs", authMiddleware, (req, res) => {
+  const prefs = getUserPrefs(req.auth.userId);
+  if (!prefs) return res.status(404).json({ error: "User not found" });
+  return res.json({ prefs });
+});
+
+app.patch("/api/users/me/prefs", authMiddleware, (req, res) => {
+  const prefs = setUserPrefs(req.auth.userId, req.body || {});
+  if (!prefs) return res.status(404).json({ error: "User not found" });
+  return res.json({ prefs });
+});
+
 app.get("/api/families/:familyId/list", authMiddleware, (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
 
@@ -463,12 +482,14 @@ app.post("/api/families/:familyId/items", authMiddleware, (req, res) => {
   }
 
   const settings = getFamilySettings(familyId);
+  const addedBy = (req.auth?.username || "") + "#" + (req.auth?.userNumber || "");
   const result = smartAddItem({
     id: nanoid(10),
     familyId,
     name,
     quantity,
-    duplicateBehavior: settings.duplicateBehavior
+    duplicateBehavior: settings.duplicateBehavior,
+    addedBy
   });
 
   emitItems(familyId);
@@ -690,7 +711,7 @@ app.get("/api/families/:familyId/settings", authMiddleware, (req, res) => {
   return res.json({ settings: getFamilySettings(familyId) });
 });
 
-app.post("/api/families/:familyId/settings", authMiddleware, (req, res) => {
+app.post("/api/families/:familyId/settings", authMiddleware, requireFamilyRole("admin"), (req, res) => {
   const familyId = String(req.params.familyId || "").toUpperCase();
   if (req.auth.familyId !== familyId) {
     return res.status(403).json({ error: "Not allowed" });
@@ -700,6 +721,7 @@ app.post("/api/families/:familyId/settings", authMiddleware, (req, res) => {
     duplicateBehavior: req.body?.duplicateBehavior,
     autoDeleteAfterHours: req.body?.autoDeleteAfterHours
   });
+  emitSettings(familyId);
   return res.json({ settings: updated });
 });
 

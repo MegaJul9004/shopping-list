@@ -73,6 +73,12 @@ export function AppProvider({ children }) {
     };
   });
 
+  // Familien-Einstellungen (vom Server, fuer ganze Familie geltend - nur Admin editierbar)
+  const [familySettings, setFamilySettings] = useState({ duplicateBehavior: "merge", autoDeleteAfterHours: 0 });
+
+  // Persoenliche Voreinstellungen (pro Nutzer, zeigen "wer hat hinzugefuegt")
+  const [prefs, setPrefs] = useState({ showAddedBy: false });
+
   // Theme State (with dark mode toggle)
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem("shopping_theme");
@@ -177,6 +183,25 @@ export function AppProvider({ children }) {
     }
   }, [theme]);
 
+  // Familien-Settings + eigene Prefs laden (sync). Poll alle 15s, da kein Socket im Context.
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const f = await api("/families/" + session.familyId + "/settings", {}, session.token);
+        if (!cancelled && f?.settings) setFamilySettings(f.settings);
+      } catch {}
+      try {
+        const pp = await api("/users/me/prefs", {}, session.token);
+        if (!cancelled && pp?.prefs) setPrefs(pp.prefs);
+      } catch {}
+    };
+    load();
+    const timer = setInterval(load, 15000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [session?.familyId, session?.token]);
+
   // Theme helper functions
   const updateTheme = (newValues) => {
     setTheme(prev => ({ ...prev, ...newValues }));
@@ -199,9 +224,33 @@ export function AppProvider({ children }) {
     setTheme(prev => ({ ...prev, darkMode: !prev.darkMode }));
   };
 
-  // Settings update function
+  // Settings update function (lokale/persoenliche+visuelle Einstellungen)
   const updateSettings = (newSettings) => {
     setSettings(prev => ({ ...prev, ...newSettings }));
+  };
+
+  // Familien-Einstellungen aendern (Server; nur Admin darf - Backend weist sonst ab)
+  const updateFamilySettings = async (newSettings) => {
+    if (!session) return;
+    try {
+      const data = await api("/families/" + session.familyId + "/settings", {
+        method: "POST",
+        body: JSON.stringify(newSettings)
+      }, session.token);
+      if (data?.settings) setFamilySettings(data.settings);
+      return data;
+    } catch (e) { throw e; }
+  };
+
+  // Eigene Voreinstellungen aendern (zeigt "wer hat hinzugefuegt")
+  const setMyPref = async (key, value) => {
+    if (!session) return;
+    const next = { ...prefs, [key]: value };
+    setPrefs(next);
+    try {
+      const data = await api("/users/me/prefs", { method: "PATCH", body: JSON.stringify(next) }, session.token);
+      if (data?.prefs) setPrefs(data.prefs);
+    } catch {}
   };
 
   // Übersetzungs-Helfer: t("nav.home") mit deutschen Fallback
@@ -239,6 +288,10 @@ export function AppProvider({ children }) {
     setSession,
     settings,
     updateSettings,
+    familySettings,
+    updateFamilySettings,
+    prefs,
+    setMyPref,
     theme,
     updateTheme,
     resetTheme,

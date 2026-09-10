@@ -2,7 +2,8 @@
 import path from "node:path";
 
 // Globale Rollen werden ueber einzelne Textdateien in backend/roles/ verwaltet.
-// Jede Zeile: "benutzername#nutzernummer". Kommentare mit // und Leerzeilen werden ignoriert.
+// Jede Zeile: "benutzername|nutzernummer". Kommentare mit // und Leerzeilen werden ignoriert.
+// Trennzeichen ist | (Pipe), NICHT #, weil Proxmox # als Kommentarzeichen interpretiert.
 const rolesDir = path.resolve(process.cwd(), "roles");
 if (!fs.existsSync(rolesDir)) fs.mkdirSync(rolesDir, { recursive: true });
 
@@ -43,10 +44,10 @@ export function readRoleMembers(role) {
   for (const line of lines) {
     const entry = normalizeLine(line);
     if (!entry) continue;
-    const hashIdx = entry.indexOf("#");
-    if (hashIdx === -1) continue;
-    const username = entry.slice(0, hashIdx).trim();
-    const userNumber = Number(entry.slice(hashIdx + 1).trim());
+    const sepIdx = entry.indexOf("|");
+    if (sepIdx === -1) continue;
+    const username = entry.slice(0, sepIdx).trim();
+    const userNumber = Number(entry.slice(sepIdx + 1).trim());
     if (!username || !Number.isFinite(userNumber)) continue;
     members.push({ username, userNumber });
   }
@@ -55,7 +56,7 @@ export function readRoleMembers(role) {
 
 export function writeRoleMembers(role, members) {
   const file = roleFile(role);
-  const lines = members.map((m) => `${m.username}#${m.userNumber}`);
+  const lines = members.map((m) => `${m.username}|${m.userNumber}`);
   fs.writeFileSync(file, lines.join("\n") + (lines.length ? "\n" : ""), "utf8");
 }
 

@@ -24,6 +24,7 @@ export default function NavBar({ session, onLogout }) {
         <NavLink to="/offers" className="nav-link" title={t("nav.offers")}>🏷️ <span className="nav-label">{t("nav.offers")}</span></NavLink>
         <NavLink to="/rezepte" className="nav-link" title={t("nav.recipes")}>🍳 <span className="nav-label">{t("nav.recipes")}</span></NavLink>
         <NavLink to="/settings" className="nav-link" title={t("nav.settings")}>⚙️ <span className="nav-label">{t("nav.settings")}</span></NavLink>
+        <NavLink to="/familie" className="nav-link">👨‍👩‍👧 <span className="nav-label">Familie</span></NavLink>
         {session ? (
           <a href="#" onClick={(e) => { e.preventDefault(); handleLogout(); }}>
             Abmelden ({session.username})
