@@ -65,6 +65,19 @@ function loadStore() {
 
 let store = loadStore();
 
+// Migration: Bestehenden Nutzern ohne userNumber eine fortlaufende Nummer geben,
+// damit addedBy (username#nutzernummer) und die Rollen-Dateien korrekt funktionieren.
+(function migrateUserNumbers() {
+  let next = Number(store.nextUserNumber) || 1;
+  for (const u of store.users) {
+    if (!Number.isFinite(Number(u.userNumber))) {
+      u.userNumber = next++;
+    }
+  }
+  store.nextUserNumber = next;
+  persist();
+})();
+
 function persist() {
   fs.writeFileSync(dbPath, JSON.stringify(store, null, 2), "utf8");
 }

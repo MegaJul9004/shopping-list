@@ -17,21 +17,24 @@
       "familyId": "G44WPS",
       "username": "2",
       "passwordHash": "$2a$10$U/5RwPEeT2qL5jxcEZPwx.g5sqRaHIFExf8/L90k0vTs2hKnfSqeS",
-      "createdAt": "2026-08-19T16:24:44.691Z"
+      "createdAt": "2026-08-19T16:24:44.691Z",
+      "userNumber": 1
     },
     {
       "id": "BsAkMatqX1B0",
       "familyId": "UKTX4Y",
       "username": "3",
       "passwordHash": "$2a$10$Wbpin381yL5k7WKcYCfdKOcOrmBAHUZhiTgPfzyI92k3ul5OjTl4W",
-      "createdAt": "2026-08-19T16:35:05.539Z"
+      "createdAt": "2026-08-19T16:35:05.539Z",
+      "userNumber": 2
     },
     {
       "id": "NodLnlb0UFo0",
       "familyId": "UKTX4Y",
       "username": "te",
       "passwordHash": "$2a$10$4gisBGtz71V.8eWhTy6Haej8H/JOajul6GSP/vyrKP7A1YD6nAfOu",
-      "createdAt": "2026-08-19T16:35:47.849Z"
+      "createdAt": "2026-08-19T16:35:47.849Z",
+      "userNumber": 3
     }
   ],
   "shoppingItems": [
@@ -74,5 +77,14 @@
       "createdAt": "2026-08-19T19:02:49.522Z"
     }
   ],
-  "savedRecipes": []
+  "savedRecipes": [],
+  "nextUserNumber": 4,
+  "appConfig": {
+    "sponsor": {
+      "iban": "",
+      "bic": "",
+      "beneficiary": "",
+      "purpose": ""
+    }
+  }
 }
