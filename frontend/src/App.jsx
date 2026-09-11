@@ -82,8 +82,8 @@ function CardShopping(p) {
               <span className="muted" style={{ fontSize: "0.75rem", display: "block", marginTop: "0.15rem" }}>➕ von {item.addedBy}</span>
             )}
             <div className="item-actions">
-              <button className="ghost" onClick={() => { p.setItemName(item.name); p.setItemQty(String(item.quantity)); p.deleteItem(item.id); }}>Bearbeiten</button>
-              <button className="danger" onClick={() => p.deleteItem(item.id)}>Löschen</button>
+              <button className="ghost icon-btn" title="Bearbeiten" onClick={() => { p.setItemName(item.name); p.setItemQty(String(item.quantity)); p.deleteItem(item.id); }}>✏️</button>
+              <button className="danger icon-btn" title="Löschen" onClick={() => p.deleteItem(item.id)}>🗑️</button>
             </div>
           </li>
         ))}
@@ -100,7 +100,7 @@ function CardShopping(p) {
                   <span className="item-qty">{item.quantity}x</span>
                 </label>
                 <div className="item-actions">
-                  <button className="danger" onClick={() => p.deleteItem(item.id)}>Löschen</button>
+                  <button className="danger icon-btn" title="Löschen" onClick={() => p.deleteItem(item.id)}>🗑️</button>
                 </div>
               </li>
             ))}
