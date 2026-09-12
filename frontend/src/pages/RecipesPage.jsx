@@ -258,7 +258,7 @@ export default function RecipesPage() {
                     <input type="number" min={1} value={target} style={{ width: "80px" }}
                       onChange={(e) => setServings(r, e.target.value)} />
                     <button type="button" className="ghost" onClick={() => setDisplayOn((p) => ({ ...p, [r.id]: !on }))}>
-                      {on ? "Display aus" : "Display an"}
+                      {on ? "Zutaten ausblenden" : "Zutaten anzeigen"}
                     </button>
                   </label>
                   {on && (
